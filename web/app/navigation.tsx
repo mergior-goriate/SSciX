@@ -39,7 +39,7 @@ export default function Navigation() {
     {links.map(([href, label, Icon]) => {
       const active = pathname === href || pathname.startsWith(href + "/");
       return <Link key={href} href={href} aria-label={label} title={label} aria-current={active ? "page" : undefined}>
-        <Icon size={19} aria-hidden="true" /><span>{label}</span>
+        <Icon size={21} aria-hidden="true" />
       </Link>;
     })}
     <details ref={menu} className="navigation-menu">
