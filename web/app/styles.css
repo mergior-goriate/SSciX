@@ -386,3 +386,46 @@ body:has(.network-layout) .header-inner { grid-template-columns: minmax(0, 1fr) 
   .header-brand-search { width: 100%; }
   .header-search { width: auto; flex: 1; }
 }
+
+.notification-trigger {
+  display: grid; place-items: center; min-width: 44px; min-height: 44px;
+  padding: .28rem .55rem; border: 0; border-radius: 7px; background: transparent; color: white;
+  anchor-name: --notification-trigger;
+}
+.notification-trigger:hover, .notification-trigger[aria-expanded="true"] { background: var(--brand); }
+body:has(.network-layout) .notification-trigger { color: var(--brand); }
+body:has(.network-layout) .notification-trigger:hover,
+body:has(.network-layout) .notification-trigger[aria-expanded="true"] { background: var(--brand-wash); }
+.notification-popover {
+  inset: 5rem auto auto 50%; transform: translateX(-50%); margin: 0; padding: .9rem;
+  width: min(25rem, calc(100vw - 1.5rem)); max-height: min(34rem, calc(100dvh - 8rem)); overflow: auto;
+  box-shadow: 0 12px 36px #001d3926;
+}
+.notification-popover header { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.notification-popover h2 { margin: 0; }
+.notification-popover header button {
+  display: grid; place-items: center; min-width: 40px; min-height: 40px;
+  padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--brand);
+}
+.notification-popover header button:hover { background: var(--brand-wash); }
+.notification-filters { margin: .65rem 0; }
+.notification-filters [aria-pressed="true"] { background: var(--brand-wash); border-color: var(--brand); }
+.notification-items { padding: 0; margin: 0 0 .65rem; }
+.notification-items li { display: grid; justify-content: stretch; }
+.notification-entry { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .55rem; align-items: start; overflow-wrap: anywhere; }
+.notification-entry a { text-decoration: none; }
+.notification-entry a:hover { text-decoration: underline; }
+.notification-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--brand); margin-top: .45rem; }
+.notification-items button { justify-self: start; font-size: .82rem; min-height: 36px; padding: .25rem .65rem; }
+
+@media (min-width: 741px) {
+  @supports (top: anchor(bottom)) {
+    .notification-popover { position-anchor: --notification-trigger; top: calc(anchor(bottom) + .5rem); left: anchor(center); }
+  }
+}
+@media (max-width: 740px) {
+  .notification-popover { top: 7rem; }
+}
+
+.site-header .header-inner .notification-popover a { color: var(--brand); }
+.site-header .notification-popover :focus-visible { outline-color: var(--brand); }
