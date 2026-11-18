@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from .auth import DB, get_user
 from .models import DirectMessage, Profile, User
 from .network import ReplyInput
+from .profiles import photo_url
 from .schemas import Slug
 from .security import limit, require_origin
 
@@ -25,14 +26,20 @@ def inbox(db: DB, request: Request):
     user = get_user(db, request)
     other = case((DirectMessage.sender_id == user.id, DirectMessage.recipient_id), else_=DirectMessage.sender_id)
     latest = (
-        select(other.label("peer_id"), DirectMessage.created_at.label("activity"), DirectMessage.id)
+        select(other.label("peer_id"), DirectMessage.created_at.label("activity"), DirectMessage.id, DirectMessage.body)
         .where(or_(DirectMessage.sender_id == user.id, DirectMessage.recipient_id == user.id))
         .ext(distinct_on(other)).order_by(other, DirectMessage.created_at.desc(), DirectMessage.id.desc()).subquery()
     )
-    return [{"slug": profile.slug, "name": profile.name, "activity": activity}
-            for profile, activity in db.execute(
-                select(Profile, latest.c.activity).join(latest, latest.c.peer_id == Profile.user_id)
-                .order_by(latest.c.activity.desc(), latest.c.id.desc()).limit(50))]
+    query = (
+        select(Profile, latest.c.activity, latest.c.body, User.deactivated_at)
+        .join(latest, latest.c.peer_id == Profile.user_id).join(User)
+        .order_by(latest.c.activity.desc(), latest.c.id.desc()).limit(50)
+    )
+    return [
+        {"slug": profile.slug, "name": profile.name, "activity": activity, "preview": body,
+         "photo": photo_url(profile) if profile.is_public and deactivated is None else ""}
+        for profile, activity, body, deactivated in db.execute(query)
+    ]
 
 
 def peer_profile(slug: str, user_id: UUID, db: DB):
@@ -55,6 +62,8 @@ def conversation(slug: Slug, db: DB, request: Request, offset: int = Query(0, ge
     entries = db.scalars(query).all()
     return {
         "name": peer.name, "can_send": can_send, "has_more": len(entries) > 50,
+        "public_profile": peer.is_public and can_send,
+        "photo": photo_url(peer) if peer.is_public and can_send else "",
         "messages": [
             {"id": entry.id, "mine": entry.sender_id == user.id, "body": entry.body, "created_at": entry.created_at}
             for entry in reversed(entries[:50])

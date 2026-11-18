@@ -25,7 +25,7 @@ type Post = {
 };
 type Community = { id: string; name: string; description: string };
 
-export function useNetworkData<T>(path: string) {
+export function useNetworkData<T>(path: string, revision = 0) {
   const [data, setData] = useState<T>();
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
@@ -40,7 +40,7 @@ export function useNetworkData<T>(path: string) {
       if (active) setError(failure?.status === 401 ? "Inicie sessão para consultar esta secção." : message(failure));
     });
     return () => { active = false; };
-  }, [path, version]);
+  }, [path, version, revision]);
 
   return { data, error, refresh: () => setVersion((value) => value + 1) };
 }
