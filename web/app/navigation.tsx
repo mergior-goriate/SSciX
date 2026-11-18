@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Bookmark, CircleHelp, Home, LogOut, Menu, MessageSquare, Settings, UserRound } from "lucide-react";
 import { Fragment, useRef, useState } from "react";
 import { api, message } from "./api-client";
@@ -15,7 +15,6 @@ const links = [
 
 export default function Navigation() {
   const pathname = usePathname();
-  const router = useRouter();
   const menu = useRef<HTMLDetailsElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -26,7 +25,7 @@ export default function Navigation() {
     try {
       await api("/auth/logout", "POST");
       if (menu.current) menu.current.open = false;
-      router.replace("/entrar");
+      window.location.replace("/entrar");
     } catch (failure) {
       setError(message(failure));
     } finally {

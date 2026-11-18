@@ -1,3 +1,4 @@
+import { fetchMemberApi } from "../../../member-api";
 import Link from "next/link";
 import { Link as LinkIcon, MessageSquare } from "lucide-react";
 import { siFacebook, siInstagram, siX } from "simple-icons";
@@ -11,8 +12,7 @@ import { details, type Profile, roles, trajectory } from "../../profile-data";
 
 const loadProfile = cache(async (slug: string): Promise<Profile> => {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length < 3 || slug.length > 40) notFound();
-  const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:8000";
-  const response = await fetch(new URL(`/api/v1/profiles/${slug}`, base), { cache: "no-store" });
+  const response = await fetchMemberApi(`/api/v1/profiles/${slug}`);
   if (response.status === 404) notFound();
   if (!response.ok) throw new Error("O serviço de perfis está indisponível.");
   return response.json();

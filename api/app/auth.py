@@ -33,6 +33,13 @@ def get_user(db: DB, request: Request, *, for_update: bool = False) -> User:
     return user
 
 
+def require_member(db: DB, request: Request) -> User:
+    return get_user(db, request)
+
+
+Member = Annotated[User, Depends(require_member)]
+
+
 def issue_email_token(db: DatabaseSession, user: User, purpose: str, pending_email: str | None = None) -> str:
     db.execute(delete(EmailToken).where(
         EmailToken.user_id == user.id, EmailToken.expires_at <= now()

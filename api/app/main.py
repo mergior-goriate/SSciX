@@ -1,4 +1,4 @@
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -36,7 +36,16 @@ def health(db: auth.DB):
 
 
 v1.include_router(auth.router)
-v1.include_router(profiles.router)
-v1.include_router(network.router)
-v1.include_router(messages.router)
+members = APIRouter(dependencies=[Depends(auth.require_member)])
+
+
+@members.get("/session", status_code=204)
+def session_status():
+    return Response(status_code=204)
+
+
+members.include_router(profiles.router)
+members.include_router(network.router)
+members.include_router(messages.router)
+v1.include_router(members)
 app.include_router(v1)

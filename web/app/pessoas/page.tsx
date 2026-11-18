@@ -1,3 +1,4 @@
+import { fetchMemberApi } from "../../member-api";
 import Link from "next/link";
 
 export const metadata = { title: "Encontrar pessoas" };
@@ -18,11 +19,8 @@ export default async function PeoplePage({ searchParams }: {
   const q = typeof params.q === "string" ? params.q.trim().slice(0, 100) : "";
   const requestedPage = typeof params.page === "string" ? Number(params.page) : 1;
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= 100_000 ? requestedPage : 1;
-  const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:8000";
-  const url = new URL("/api/v1/profiles", base);
-  url.searchParams.set("q", q);
-  url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
-  const response = await fetch(url, { cache: "no-store" }).catch(() => null);
+  const query = new URLSearchParams({ q, offset: String((page - 1) * PAGE_SIZE) });
+  const response = await fetchMemberApi(`/api/v1/profiles?${query}`).catch(() => null);
   const entries: Entry[] = response?.ok ? await response.json() : [];
 
   return (

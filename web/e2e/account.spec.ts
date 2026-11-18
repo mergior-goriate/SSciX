@@ -52,20 +52,19 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
   const visitor = await browser.newPage({ viewport: { width: 375, height: 800 } });
   try {
     const route = new URL(`/u/${slug}`, page.url()).href;
-    expect((await visitor.goto(route))?.status()).toBe(404);
+    await visitor.goto(route);
+    await expect(visitor).toHaveURL(/\/entrar$/);
     await page.getByLabel("Instituição", { exact: true }).fill("Universidade de ensaio");
     await page.getByRole("checkbox", { name: /Tornar o perfil público/ }).check();
     await page.getByRole("button", { name: "Guardar perfil" }).click();
     await expect(page.getByText("Perfil guardado.")).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Instituição", { exact: true })).toHaveValue("Universidade de ensaio");
-    await visitor.goto(route);
-    await expect(visitor.getByRole("heading", { name: "Ana Mateus" })).toBeVisible();
-    await expect(visitor.getByText("Universidade de ensaio", { exact: true })).toBeVisible();
-    await expect(visitor.getByText(email)).toHaveCount(0);
-    expect(await visitor.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
-    expect(await visitor.locator(".network-layout").evaluate((layout) =>
-      getComputedStyle(layout).gridTemplateColumns.split(" ").length)).toBe(1);
+    for (const path of ["/rede", "/comunidades", "/mensagens", "/pessoas", "/notificacoes", "/perfil"]) {
+      const response = await visitor.request.get(new URL(path, route).href, { maxRedirects: 0 });
+      expect(response.status()).toBe(307);
+      expect(new URL(response.headers().location, route).pathname).toBe("/entrar");
+    }
     const peerSlug = `celia-${id}`;
     const peerEmail = `${peerSlug}@example.com`;
     const origin = new URL(page.url()).origin;
@@ -77,6 +76,13 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     expect(peerRegistration.status()).toBe(202);
     const token = new URL(await linkFromMail("confirmar-email", peerEmail)).hash.slice("#token=".length);
     expect((await peer.post(origin + "/api/v1/auth/verify", { headers, data: { token, password } })).status()).toBe(204);
+    await visitor.goto(route);
+    await expect(visitor.getByRole("heading", { name: "Ana Mateus" })).toBeVisible();
+    await expect(visitor.getByText("Universidade de ensaio", { exact: true })).toBeVisible();
+    await expect(visitor.getByText(email)).toHaveCount(0);
+    expect(await visitor.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    expect(await visitor.locator(".network-layout").evaluate((layout) =>
+      getComputedStyle(layout).gridTemplateColumns.split(" ").length)).toBe(1);
     const { email: _email, ...peerProfile } = await (await peer.get(origin + "/api/v1/profiles/me")).json();
     expect((await peer.put(origin + "/api/v1/profiles/me", {
       headers, data: { ...peerProfile, keywords: ["Educação"], is_public: true },

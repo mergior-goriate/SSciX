@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
-from .auth import DB, get_user
+from .auth import DB, Member, get_user
 from .models import Bookmark, Community, Discussion, Follow, Mention, Profile, Reaction, User
 from .profiles import image_response, photo_url
 from .schemas import Input, Name, Slug, image_data, web_url
@@ -120,19 +120,10 @@ def create_community(data: CommunityInput, db: DB, request: Request):
     return value
 
 
-def optional_viewer(db: DB, request: Request):
-    try:
-        return get_user(db, request).id
-    except HTTPException as error:
-        if error.status_code != 401:
-            raise
-        return None
-
-
 @router.get("/feed", response_model=list[PostView])
-def feed(db: DB, request: Request, following: bool = False, community_id: UUID | None = None, author: Slug | None = None):
+def feed(db: DB, user: Member, following: bool = False, community_id: UUID | None = None, author: Slug | None = None):
     conditions = [Discussion.parent_id.is_(None)]
-    viewer = get_user(db, request).id if following else optional_viewer(db, request)
+    viewer = user.id
     if following:
         conditions.append(Discussion.author_id.in_(select(Follow.followed_id).where(Follow.follower_id == viewer)))
     if author is not None:
@@ -165,8 +156,8 @@ def visible_topic(db: DB, post_id: UUID, viewer: UUID | None = None):
 
 
 @router.get("/feed/{post_id}", response_model=PostView)
-def topic(post_id: UUID, db: DB, request: Request):
-    return visible_topic(db, post_id, optional_viewer(db, request))
+def topic(post_id: UUID, db: DB, user: Member):
+    return visible_topic(db, post_id, user.id)
 
 
 @router.get("/feed/{post_id}/image")
