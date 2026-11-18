@@ -16,7 +16,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <header className="site-header">
           <div className="site-width header-inner">
             <div className="header-brand-search">
-              <Link href="/" className="wordmark" aria-label="SSciX, início">
+              <Link href="/rede" className="wordmark" aria-label="SSciX, Feed académico">
                 <span className="mark" aria-hidden="true"><i /><i /><i /></span>
                 <span>SSci<span className="accent">X</span></span>
               </Link>
