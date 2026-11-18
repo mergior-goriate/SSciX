@@ -90,7 +90,11 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     const recommendation = page.getByRole("listitem").filter({ hasText: "Célia Chissano" });
     await recommendation.getByRole("button", { name: "Seguir", exact: true }).click();
     await expect(recommendation.getByRole("button", { name: "Deixar de seguir" })).toBeVisible();
-    await recommendation.getByRole("link", { name: "Célia Chissano" }).click();
+    const headerSearch = page.getByRole("searchbox", { name: "Pesquisar na SSciX", exact: true });
+    await headerSearch.fill("Célia Chissano");
+    await headerSearch.press("Enter");
+    await expect(page).toHaveURL(/\/pessoas\?q=/);
+    await page.getByRole("link", { name: "Célia Chissano", exact: true }).click();
     await expect(page.getByText("1 Seguidores")).toBeVisible();
     await page.getByRole("link", { name: "Enviar mensagem" }).click();
     await page.getByLabel("Escrever mensagem").fill("Olá, Célia. Vamos colaborar?");
