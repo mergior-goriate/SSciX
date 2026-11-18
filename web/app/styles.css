@@ -181,9 +181,17 @@ dd { margin: 0; }
 .context-communities small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: var(--muted); }
 .feed-discovery h2 { font-size: 1.08rem; margin-bottom: .55rem; letter-spacing: -.015em; }
 .feed-discovery { display: grid; align-content: start; gap: 1rem; min-width: 0; }
-.feed-researchers { list-style: none; padding: 0; margin: 0 0 .9rem; }
-.feed-researchers li { display: flex; align-items: center; gap: .62rem; padding: .65rem 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
-.feed-researchers small { display: block; }
+.feed-researchers { display: grid; gap: .6rem; list-style: none; padding: 0; margin: 0 0 .9rem; }
+.feed-researchers li {
+  display: grid; gap: .5rem; padding: .65rem; border: 1px solid var(--line);
+  border-radius: 10px; overflow-wrap: anywhere;
+}
+.researcher-identity { display: flex; align-items: center; gap: .6rem; }
+.researcher-identity .feed-initials { border-radius: 50%; }
+.researcher-identity a { font-weight: 700; }
+.feed-researchers small { display: block; color: var(--muted); }
+.feed-researchers .follow-counts { margin: 0 0 .35rem; gap: .25rem .7rem; flex-wrap: wrap; font-size: .75rem; }
+.feed-researchers .secondary { min-height: 36px; padding: .3rem .75rem; font-size: .86rem; }
 .feed-author { display: flex; align-items: center; gap: .65rem; overflow-wrap: anywhere; }
 .feed-initials { flex: 0 0 auto; display: grid; place-items: center; border-radius: .65rem; width: 2.4rem; height: 2.4rem; background: var(--brand-wash); color: var(--brand-deep); font-weight: 750; }
 .feed-filters { display: flex; flex-wrap: wrap; gap: .55rem; }

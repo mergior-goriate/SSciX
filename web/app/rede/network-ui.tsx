@@ -148,19 +148,23 @@ export function ResearcherDiscovery({ similarTo }: { similarTo?: string }) {
 
   return <div className="feed-discovery" role="region" aria-label={similarTo ? "Perfis semelhantes" : "Descobrir investigadores"}>
     <section className="panel">
-      <h2>{similarTo ? "Perfis semelhantes" : "Pessoas para seguir"}</h2>
+      <h2>{similarTo ? "Perfis semelhantes" : "Investigadores para seguir"}</h2>
       {error ? <p className="muted">{error}</p> :
         !data ? <p className="muted" role="status">A carregar perfis…</p> :
           !data.length ? <p className="muted">Ainda não há sugestões.</p> :
             <ul className="feed-researchers">{data.map((person) => (
               <li key={person.slug}>
-                <Avatar name={person.name} photo={person.photo} />
-                <div>
-                  <Link href={`/u/${person.slug}`}>{person.name}</Link>
-                  {(person.institution || person.specialization) && <small>{person.institution || person.specialization}</small>}
-                  <small>{person.common_keywords.join(", ") || "Investigador na SSciX"}</small>
-                  <FollowButton slug={person.slug} showCounts />
+                <div className="researcher-identity">
+                  <Avatar name={person.name} photo={person.photo} />
+                  <div>
+                    <Link href={`/u/${person.slug}`}>{person.name}</Link>
+                    {(person.institution || person.specialization) && <small>{person.institution || person.specialization}</small>}
+                  </div>
                 </div>
+                {person.common_keywords.length > 0 && <small className="researcher-topics">
+                  Em comum: {person.common_keywords.join(", ")}
+                </small>}
+                <FollowButton slug={person.slug} showCounts />
               </li>
             ))}</ul>}
       <Link href="/pessoas">Ver directório de pessoas</Link>

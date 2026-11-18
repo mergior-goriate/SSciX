@@ -2,8 +2,8 @@ from base64 import b64decode
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel
-from sqlalchemy import cast, delete, func, or_, select
-from sqlalchemy.dialects.postgresql import JSONB, array, insert
+from sqlalchemy import case, cast, delete, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.exc import IntegrityError
 
 from .auth import DB, get_user
@@ -108,15 +108,18 @@ def suggestions(db: DB, request: Request, similar_to: Slug | None = None):
             select(Follow.followed_id).where(Follow.follower_id == user.id)
         ))
     if keywords:
-        query = query.where(cast(Profile.keywords, JSONB).has_any(array(keywords)))
+        profile_keywords = cast(Profile.keywords, JSONB)
+        overlap = sum(case((profile_keywords.has_key(word), 1), else_=0) for word in keywords)
+        query = query.order_by(overlap.desc())
+        if similar_to:
+            query = query.where(overlap > 0)
     elif similar_to:
         return []
-    profiles = db.scalars(query.order_by(Profile.name, Profile.slug).limit(50)).all()
-    profiles.sort(key=lambda profile: -len(set(keywords).intersection(profile.keywords)))
+    profiles = db.scalars(query.order_by(Profile.name, Profile.slug).limit(6)).all()
     return [
         SuggestedProfile(**DirectoryProfile.model_validate(profile, from_attributes=True).model_dump(),
                          photo=photo_url(profile), common_keywords=[word for word in keywords if word in profile.keywords])
-        for profile in profiles[:6]
+        for profile in profiles
     ]
 
 

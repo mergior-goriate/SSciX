@@ -233,6 +233,10 @@ def test_social_workflow_permissions(account, app_config):
             suggestions = reader.get(f"{root}/profiles/discover/suggestions").json()
             suggestion = next(item for item in suggestions if item["slug"] == author_slug)
             assert suggestion["common_keywords"] == ["Educação"]
+            assert reader.put(f"{root}/profiles/me/keywords", json={"keywords": ["Astronomia"]}).status_code == 204
+            fallback = reader.get(f"{root}/profiles/discover/suggestions").json()
+            assert next(item for item in fallback if item["slug"] == author_slug)["common_keywords"] == []
+            assert all(item["slug"] != reader_slug for item in fallback)
             assert reader.put(profile_url + "/follow").json()["followers"] == 1
             assert all(item["slug"] != author_slug for item in reader.get(f"{root}/profiles/discover/suggestions").json())
             publish = author.post(f"{root}/feed", json={
