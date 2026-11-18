@@ -429,3 +429,68 @@ body:has(.network-layout) .notification-trigger[aria-expanded="true"] { backgrou
 
 .site-header .header-inner .notification-popover a { color: var(--brand); }
 .site-header .notification-popover :focus-visible { outline-color: var(--brand); }
+
+/* Mensagens privadas. */
+.messaging-shell { padding-top: clamp(14px, 3vw, 28px); }
+.messaging-layout {
+  display: grid; grid-template-columns: minmax(230px, .42fr) minmax(0, 1fr);
+  min-height: 440px; height: calc(100dvh - 130px); max-height: 860px;
+  overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--paper);
+}
+.message-inbox, .message-thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.message-inbox { border-inline-end: 1px solid var(--line); }
+.message-inbox > header, .thread-header {
+  display: flex; align-items: center; gap: .7rem; min-height: 64px; padding: .7rem .9rem;
+}
+.message-inbox > header { justify-content: space-between; }
+.message-inbox h1, .thread-header h2 { margin: 0; font-size: 1.35rem; overflow-wrap: anywhere; }
+.message-icon {
+  display: inline-grid; place-items: center; flex: 0 0 auto; min-width: 42px;
+  min-height: 42px; padding: 0; border-radius: 50%; text-decoration: none;
+}
+.message-search {
+  display: flex; align-items: center; gap: .55rem; margin: 0 .9rem .65rem; padding: 0 .65rem;
+  background: var(--brand-wash); border-radius: 999px; color: var(--brand);
+}
+.message-search svg { flex-shrink: 0; }
+.message-search:focus-within { outline: 2px solid var(--blue-mid); }
+.message-search input { min-width: 0; border: 0; outline: none; padding-inline: 0; background: transparent; }
+.inbox-content, .thread-history { flex: 1; overflow: auto; padding: .75rem .9rem; }
+.message-contacts, .message-suggestions ul { padding: 0; margin: 0; list-style: none; }
+.message-contacts a, .message-suggestions li {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .6rem; align-items: center;
+  padding: .6rem .45rem; border-radius: 8px; text-decoration: none;
+}
+.message-contacts a:hover, .message-contacts a[aria-current="page"] { background: var(--brand-wash); }
+.message-contacts strong, .message-contacts small, .message-suggestions strong, .message-suggestions small {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.message-contacts small, .message-suggestions small, .message-contacts time { color: var(--muted); font-size: .8rem; }
+.message-suggestions { margin-top: .9rem; border-top: 1px solid var(--line); padding-top: .85rem; }
+.message-suggestions h2 { font-size: 1rem; margin: 0 0 .3rem; }
+.message-suggestions .secondary { font-size: .78rem; padding: .25rem .55rem; min-height: 34px; }
+.messaging-layout .feed-initials { border-radius: 50%; }
+.thread-header { border-bottom: 1px solid var(--line); }
+.thread-refresh { margin-inline-start: auto; }
+.thread-back { display: none; }
+.thread-history { background: var(--background); }
+.message-empty {
+  display: grid; justify-items: center; gap: .4rem; padding: 1.3rem .5rem;
+  text-align: center; color: var(--muted);
+}
+.message-empty h2, .message-empty p { margin: 0; }
+.message-empty h2, .message-empty strong { color: var(--ink); }
+.message-thread-empty { justify-content: center; background: var(--background); }
+.thread-pages, .thread-quick-replies { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: center; }
+.thread-quick-replies .secondary { min-height: 34px; padding: .25rem .6rem; border-radius: 999px; font-size: .85rem; }
+.thread-compose { display: grid; gap: .45rem; padding: .7rem .9rem; border-top: 1px solid var(--line); }
+.thread-input { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .55rem; align-items: end; }
+.thread-input textarea { min-height: 44px; border-radius: 16px; background: var(--background); resize: vertical; }
+.thread-compose .notice { margin: 0; }
+
+@media (max-width: 740px) {
+  .messaging-layout { grid-template-columns: minmax(0, 1fr); height: calc(100dvh - 165px); min-height: 365px; }
+  .message-inbox { border: 0; }
+  .message-thread-empty, .has-thread .message-inbox { display: none; }
+  .thread-back { display: inline-grid; }
+}
