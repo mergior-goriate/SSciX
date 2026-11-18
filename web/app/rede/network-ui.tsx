@@ -60,16 +60,53 @@ function Composer({ endpoint, label, communityId, onSaved }: {
   }
 
   return <form className="panel form-stack" onSubmit={submit}>
-    <label>{label}<textarea name="body" rows={3} maxLength={2400} required /></label>
+    <label>{label}<textarea name="body" rows={3} maxLength={2400} placeholder={label === "Publicar" ? "Partilhe um resultado, uma pergunta ou uma proposta de colaboração." : undefined} required /></label>
     <button className="primary" disabled={busy}>{label}</button>
     {error && <p className="notice error" role="alert">{error}</p>}
   </form>;
 }
 
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => [...part][0]).join("").toUpperCase();
+}
+
+export function ResearcherDiscovery() {
+  const { data, error } = useNetworkData<{ slug: string; name: string; institution: string; specialization: string }[]>("/profiles");
+  return <aside className="feed-discovery" aria-label="Descobrir investigadores">
+    <section className="panel">
+      <h2>Encontrar pessoas</h2>
+      <form action="/pessoas" className="feed-search">
+        <label htmlFor="feed-search">Nome, instituição ou área</label>
+        <input id="feed-search" name="q" type="search" maxLength={100} />
+        <button className="secondary" type="submit">Pesquisar</button>
+      </form>
+    </section>
+    <section className="panel">
+      <h2>Perfis públicos</h2>
+      {error ? <p className="muted">Perfis temporariamente indisponíveis.</p> :
+        !data ? <p className="muted" role="status">A carregar perfis…</p> :
+          !data.length ? <p className="muted">Ainda não há perfis públicos.</p> :
+            <ul className="feed-researchers">{data.slice(0, 5).map((person) => (
+              <li key={person.slug}>
+                <span className="feed-initials" aria-hidden="true">{initials(person.name)}</span>
+                <div>
+                  <Link href={`/u/${person.slug}`}>{person.name}</Link>
+                  {(person.institution || person.specialization) && <small>{person.institution || person.specialization}</small>}
+                </div>
+              </li>
+            ))}</ul>}
+      <Link href="/pessoas">Ver directório de pessoas</Link>
+    </section>
+  </aside>;
+}
+
 function PostCard({ post, link }: { post: Post; link?: boolean }) {
   return <article className="panel network-post">
     <header>
-      <Link href={`/u/${post.author_slug}`}><strong>{post.author_name}</strong></Link>
+      <div className="feed-author">
+        <span className="feed-initials" aria-hidden="true">{initials(post.author_name)}</span>
+        <Link href={`/u/${post.author_slug}`}><strong>{post.author_name}</strong></Link>
+      </div>
       <time className="muted" dateTime={post.created_at}>{post.created_at.slice(0, 10)}</time>
     </header>
     {post.community_id && <Link href={`/comunidades/${post.community_id}`}>{post.community_name}</Link>}
@@ -91,14 +128,14 @@ export function Feed({ communityId }: { communityId?: string }) {
   const { data, error, refresh } = useNetworkData<Post[]>(path);
 
   return <div className="network-stack">
-    {!communityId && <div className="profile-actions" aria-label="Filtrar publicações">
-      <button className="secondary" aria-pressed={!following} onClick={() => setFollowing(false)}>Publicações recentes</button>
-      <button className="secondary" aria-pressed={following} onClick={() => setFollowing(true)}>Pessoas que sigo</button>
-    </div>}
     <Composer endpoint="/feed" communityId={communityId} label="Publicar" onSaved={() => {
       if (following) setFollowing(false);
       refresh();
     }} />
+    {!communityId && <div className="feed-filters" role="group" aria-label="Filtrar publicações">
+      <button className="secondary" aria-pressed={!following} onClick={() => setFollowing(false)}>Publicações recentes</button>
+      <button className="secondary" aria-pressed={following} onClick={() => setFollowing(true)}>Pessoas que sigo</button>
+    </div>}
     <Posts data={data} error={error} empty="Ainda não há publicações para mostrar." link />
   </div>;
 }
