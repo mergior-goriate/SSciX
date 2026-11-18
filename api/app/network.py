@@ -1,16 +1,19 @@
+import re
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, StringConstraints
-from sqlalchemy import select
+from pydantic import BaseModel, Field, StringConstraints, field_validator
+from sqlalchemy import delete, false, func, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
 from .auth import DB, get_user
-from .models import Community, Discussion, Follow, Profile
-from .schemas import Input, Name
-from .security import limit, require_origin
+from .models import Bookmark, Community, Discussion, Follow, Mention, Profile, Reaction, User
+from .profiles import image_response, photo_url
+from .schemas import Input, Name, image_data, web_url
+from .security import limit, now, require_origin
 
 router = APIRouter(tags=["rede académica"])
 same_origin = [Depends(require_origin)]
@@ -25,13 +28,17 @@ class CommunityView(CommunityInput):
     id: UUID
 
 
-class PostInput(Input):
-    body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2400)]
-    community_id: UUID | None = None
-
-
 class ReplyInput(Input):
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2400)]
+
+
+class PostInput(ReplyInput):
+    community_id: UUID | None = None
+    image: str = Field(default="", max_length=700_000)
+    article_url: str = Field(default="", max_length=1000)
+
+    _image = field_validator("image")(image_data)
+    _url = field_validator("article_url")(web_url)
 
 
 class PostView(BaseModel):
@@ -42,14 +49,28 @@ class PostView(BaseModel):
     created_at: str
     community_id: UUID | None
     community_name: str | None
+    author_photo: str
+    image: str
+    article_url: str
+    likes: int
+    liked: bool = False
+    saved: bool = False
 
 
-def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40):
+def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40, viewer: UUID | None = None):
+    likes = select(func.count()).select_from(Reaction).join(User).where(
+        Reaction.post_id == Discussion.id, User.deactivated_at.is_(None),
+    ).correlate(Discussion).scalar_subquery()
+    liked, saved = false(), false()
+    if viewer:
+        liked = select(Reaction.post_id).where(Reaction.post_id == Discussion.id, Reaction.user_id == viewer).exists()
+        saved = select(Bookmark.post_id).where(Bookmark.post_id == Discussion.id, Bookmark.user_id == viewer).exists()
     query = (
-        select(Discussion, Profile, Community.name)
+        select(Discussion, Profile, Community.name, likes, liked, saved)
         .join(Profile, Profile.user_id == Discussion.author_id)
+        .join(User, User.id == Profile.user_id)
         .outerjoin(Community, Community.id == Discussion.community_id)
-        .where(Profile.is_public.is_(True), *conditions)
+        .where(Profile.is_public.is_(True), User.deactivated_at.is_(None), *conditions)
         .order_by(Discussion.created_at.desc() if newest else Discussion.created_at, Discussion.id)
         .limit(page_size)
     )
@@ -57,13 +78,15 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40):
         PostView(
             id=post.id, body=post.body, author_name=author.name, author_slug=author.slug,
             created_at=post.created_at.isoformat(), community_id=post.community_id, community_name=community,
+            author_photo=photo_url(author), image=f"/api/v1/feed/{post.id}/image" if post.image else "",
+            article_url=post.article_url, likes=likes, liked=liked, saved=saved,
         )
-        for post, author, community in db.execute(query)
+        for post, author, community, likes, liked, saved in db.execute(query)
     ]
 
 
 def public_author(db: DB, request: Request):
-    user = get_user(db, request)
+    user = get_user(db, request, for_update=True)
     profile = db.get(Profile, user.id, with_for_update={"key_share": True})
     if not profile.is_public:
         raise HTTPException(403, "Torne o seu perfil público para participar na rede académica.")
@@ -97,16 +120,25 @@ def create_community(data: CommunityInput, db: DB, request: Request):
     return value
 
 
+def optional_viewer(db: DB, request: Request):
+    try:
+        return get_user(db, request).id
+    except HTTPException as error:
+        if error.status_code != 401:
+            raise
+        return None
+
+
 @router.get("/feed", response_model=list[PostView])
 def feed(db: DB, request: Request, following: bool = False, community_id: UUID | None = None):
     conditions = [Discussion.parent_id.is_(None)]
+    viewer = get_user(db, request).id if following else optional_viewer(db, request)
     if following:
-        user = get_user(db, request)
-        conditions.append(Discussion.author_id.in_(select(Follow.followed_id).where(Follow.follower_id == user.id)))
+        conditions.append(Discussion.author_id.in_(select(Follow.followed_id).where(Follow.follower_id == viewer)))
     if community_id is not None:
         community(community_id, db)
         conditions.append(Discussion.community_id == community_id)
-    return read_posts(db, *conditions)
+    return read_posts(db, *conditions, viewer=viewer)
 
 
 @router.post("/feed", status_code=201, response_model=PostView, dependencies=same_origin)
@@ -117,28 +149,40 @@ def publish(data: PostInput, db: DB, request: Request):
     post = Discussion(**data.model_dump(), author_id=author.user_id)
     db.add(post)
     db.flush()
+    record_mentions(db, post)
     value = read_posts(db, Discussion.id == post.id)[0]
     db.commit()
     return value
 
 
-def visible_topic(db: DB, post_id: UUID):
-    posts = read_posts(db, Discussion.id == post_id, Discussion.parent_id.is_(None))
+def visible_topic(db: DB, post_id: UUID, viewer: UUID | None = None):
+    posts = read_posts(db, Discussion.id == post_id, Discussion.parent_id.is_(None), viewer=viewer)
     if not posts:
         raise HTTPException(404, "Publicação indisponível.")
     return posts[0]
 
 
 @router.get("/feed/{post_id}", response_model=PostView)
-def topic(post_id: UUID, db: DB):
-    return visible_topic(db, post_id)
+def topic(post_id: UUID, db: DB, request: Request):
+    return visible_topic(db, post_id, optional_viewer(db, request))
+
+
+@router.get("/feed/{post_id}/image")
+def post_image(post_id: UUID, db: DB):
+    post = db.scalar(select(Discussion).join(Profile, Profile.user_id == Discussion.author_id).join(
+        User, User.id == Profile.user_id,
+    ).where(Discussion.id == post_id, Discussion.parent_id.is_(None), Profile.is_public.is_(True),
+            User.deactivated_at.is_(None)))
+    return image_response(post.image if post else "")
 
 
 @router.get("/feed/{post_id}/replies", response_model=list[PostView])
 def replies(post_id: UUID, db: DB):
     visible_topic(db, post_id)
     parent, author = aliased(Discussion), aliased(Profile)
-    visible_parent = select(parent.id).join(author, author.user_id == parent.author_id).where(author.is_public.is_(True))
+    visible_parent = select(parent.id).join(author, author.user_id == parent.author_id).join(
+        User, User.id == author.user_id,
+    ).where(author.is_public.is_(True), User.deactivated_at.is_(None))
     return read_posts(db, Discussion.parent_id == post_id, Discussion.parent_id.in_(visible_parent), newest=False)
 
 
@@ -149,6 +193,84 @@ def reply(post_id: UUID, data: ReplyInput, db: DB, request: Request):
     post = Discussion(body=data.body, author_id=author.user_id, parent_id=topic.id, community_id=topic.community_id)
     db.add(post)
     db.flush()
+    record_mentions(db, post)
     value = read_posts(db, Discussion.id == post.id)[0]
     db.commit()
     return value
+
+
+def record_mentions(db: DB, post: Discussion):
+    slugs = set(re.findall(r"(?<![\w@])@([a-z0-9]+(?:-[a-z0-9]+)*)(?![\w-])", post.body))
+    if not slugs:
+        return
+    recipients = db.scalars(select(Profile.user_id).join(User).where(
+        Profile.slug.in_(slugs), Profile.user_id != post.author_id, User.deactivated_at.is_(None),
+    ))
+    db.add_all(Mention(recipient_id=recipient, post_id=post.id) for recipient in recipients)
+
+
+@router.get("/saved", response_model=list[PostView])
+def saved(db: DB, request: Request):
+    user = get_user(db, request)
+    return read_posts(db, Discussion.parent_id.is_(None), Discussion.id.in_(
+        select(Bookmark.post_id).where(Bookmark.user_id == user.id)
+    ), viewer=user.id)
+
+
+@router.get("/feed/{post_id}/actions")
+def actions(post_id: UUID, db: DB, request: Request):
+    user = get_user(db, request)
+    topic = visible_topic(db, post_id, user.id)
+    return {"liked": topic.liked, "saved": topic.saved, "likes": topic.likes}
+
+
+@router.put("/feed/{post_id}/actions/{action}", dependencies=same_origin)
+def add_action(post_id: UUID, action: str, db: DB, request: Request):
+    return write_action(post_id, action, True, db, request)
+
+
+@router.delete("/feed/{post_id}/actions/{action}", dependencies=same_origin)
+def remove_action(post_id: UUID, action: str, db: DB, request: Request):
+    return write_action(post_id, action, False, db, request)
+
+
+def write_action(post_id: UUID, action: str, enabled: bool, db: DB, request: Request):
+    user = get_user(db, request, for_update=True)
+    model = {"like": Reaction, "save": Bookmark}.get(action)
+    if model is None:
+        raise HTTPException(404, "Acção indisponível.")
+    visible_topic(db, post_id)
+    if enabled:
+        db.execute(insert(model).values(user_id=user.id, post_id=post_id).on_conflict_do_nothing())
+    else:
+        db.execute(delete(model).where(model.user_id == user.id, model.post_id == post_id))
+    db.commit()
+    return actions(post_id, db, request)
+
+
+@router.get("/notifications")
+def notifications(db: DB, request: Request):
+    user = get_user(db, request)
+    parent, parent_profile, parent_user = aliased(Discussion), aliased(Profile), aliased(User)
+    visible_parents = select(parent.id).join(parent_profile, parent_profile.user_id == parent.author_id).join(
+        parent_user, parent_user.id == parent_profile.user_id,
+    ).where(parent_profile.is_public.is_(True), parent_user.deactivated_at.is_(None))
+    query = (
+        select(Mention, Discussion, Profile).join(Discussion, Discussion.id == Mention.post_id)
+        .join(Profile, Profile.user_id == Discussion.author_id).join(User, User.id == Profile.user_id)
+        .where(Mention.recipient_id == user.id, Profile.is_public.is_(True), User.deactivated_at.is_(None),
+               Discussion.parent_id.is_(None) | Discussion.parent_id.in_(visible_parents))
+        .order_by(Discussion.created_at.desc(), Discussion.id).limit(40)
+    )
+    return [
+        {"id": post.id, "topic_id": post.parent_id or post.id, "author_name": author.name,
+         "created_at": post.created_at, "read": mention.read_at is not None}
+        for mention, post, author in db.execute(query)
+    ]
+
+
+@router.put("/notifications/{post_id}/read", status_code=204, dependencies=same_origin)
+def mark_read(post_id: UUID, db: DB, request: Request):
+    user = get_user(db, request)
+    db.execute(update(Mention).where(Mention.recipient_id == user.id, Mention.post_id == post_id).values(read_at=now()))
+    db.commit()

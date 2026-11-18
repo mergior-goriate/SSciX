@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 def send_link(address: str, purpose: str, secret: str):
     route, title = {
         "verify": ("confirmar-email", "Confirme o seu endereço de email"),
+        "change-email": ("confirmar-novo-email", "Confirme o novo endereço de email"),
         "reset": ("nova-palavra-passe", "Redefina a sua palavra-passe"),
     }[purpose]
     subject = f"SSciX · {title}"

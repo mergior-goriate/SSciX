@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./styles.css";
+import Navigation from "./navigation";
 
 export const metadata: Metadata = {
   title: { default: "SSciX | Rede académica", template: "%s | SSciX" },
@@ -21,12 +22,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <input name="q" type="search" aria-label="Pesquisar investigadores" placeholder="Nome, instituição ou área" maxLength={100} required />
               <button className="secondary" type="submit">Pesquisar</button>
             </form>
-            <nav aria-label="Navegação principal">
-              <Link href="/rede">Rede académica</Link>
-              <Link href="/comunidades">Comunidades</Link>
-              <Link href="/pessoas">Encontrar pessoas</Link>
-              <Link href="/perfil">Meu perfil</Link>
-            </nav>
+            <Navigation />
           </div>
         </header>
         {children}

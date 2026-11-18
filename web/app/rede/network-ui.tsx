@@ -1,13 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
+import { Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
+import Avatar from "../avatar";
+import { readImage } from "../media";
+import FollowButton from "../u/[slug]/follow-button";
 
 type Post = {
   id: string;
   body: string;
   author_name: string;
+  author_photo: string;
+  image: string;
+  article_url: string;
+  likes: number;
+  liked: boolean;
+  saved: boolean;
   author_slug: string;
   created_at: string;
   community_name: string | null;
@@ -15,7 +25,7 @@ type Post = {
 };
 type Community = { id: string; name: string; description: string };
 
-function useNetworkData<T>(path: string) {
+export function useNetworkData<T>(path: string) {
   const [data, setData] = useState<T>();
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
@@ -35,21 +45,62 @@ function useNetworkData<T>(path: string) {
   return { data, error, refresh: () => setVersion((value) => value + 1) };
 }
 
+const emojis = ["😊", "👏", "💡", "🔬", "📚", "✅", "🤝", "🎓"];
+
 function Composer({ endpoint, label, communityId, onSaved }: {
   endpoint: string; label: string; communityId?: string; onSaved: () => void;
 }) {
+  const canAttach = endpoint === "/feed";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [body, setBody] = useState("");
+  const [image, setImage] = useState("");
+  const [article, setArticle] = useState(false);
+  const [emojiMenu, setEmojiMenu] = useState(false);
+  const input = useRef<HTMLTextAreaElement>(null);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const body = String(new FormData(form).get("body") ?? "").trim();
-    if (!body) return;
+  async function attach(file?: File) {
+    if (!file) return;
     setBusy(true);
     setError("");
     try {
-      await api(endpoint, "POST", { body, ...(communityId ? { community_id: communityId } : {}) });
+      setImage(await readImage(file, 500 * 1024));
+    } catch (failure) {
+      setError(message(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function insertEmoji(emoji: string) {
+    const field = input.current;
+    if (!field) return;
+    const { selectionStart, selectionEnd } = field;
+    const next = body.slice(0, selectionStart) + emoji + body.slice(selectionEnd);
+    if (next.length > 2400) return;
+    setBody(next);
+    setEmojiMenu(false);
+    requestAnimationFrame(() => {
+      field.focus();
+      field.setSelectionRange(selectionStart + emoji.length, selectionStart + emoji.length);
+    });
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !body.trim()) return;
+    const form = event.currentTarget;
+    const articleUrl = String(new FormData(form).get("article_url") ?? "");
+    setBusy(true);
+    setError("");
+    try {
+      await api(endpoint, "POST", {
+        body: body.trim(), ...(canAttach ? { image, article_url: articleUrl, community_id: communityId } : {}),
+      });
+      setBody("");
+      setImage("");
+      setArticle(false);
+      setEmojiMenu(false);
       form.reset();
       onSaved();
     } catch (failure) {
@@ -60,38 +111,63 @@ function Composer({ endpoint, label, communityId, onSaved }: {
   }
 
   return <form className="panel form-stack network-composer" onSubmit={submit}>
-    <label>{label}<textarea name="body" rows={3} maxLength={2400} placeholder={label === "Publicar" ? "Partilhe um resultado, uma pergunta ou uma proposta de colaboração." : undefined} required /></label>
-    <button className="primary" disabled={busy}>{label}</button>
+    <label>{canAttach ? "Criar publicação" : label}
+      <textarea ref={input} name="body" rows={3} maxLength={2400} value={body}
+        onChange={(event) => setBody(event.target.value)}
+        placeholder={canAttach ? "Partilhe um resultado, uma pergunta ou uma proposta de colaboração." : undefined} required />
+    </label>
+    <small>Use @ seguido do endereço público do perfil para mencionar alguém.</small>
+    {article && <label>Ligação para um artigo<input name="article_url" type="url" maxLength={1000} /></label>}
+    {image && <div className="composer-preview"><img src={image} alt="Pré-visualização da imagem" />
+      <button type="button" className="secondary" onClick={() => setImage("")}>Remover imagem</button></div>}
+    <div className="composer-tools">
+      <button className="secondary icon-action" type="button" aria-expanded={emojiMenu}
+        onClick={() => setEmojiMenu(!emojiMenu)}><Smile size={18} aria-hidden="true" /> Emojis</button>
+      {canAttach && <>
+        <label className="secondary attachment-label"><ImagePlus size={18} aria-hidden="true" /> Imagem
+          <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy}
+            onChange={(event) => { void attach(event.target.files?.[0]); event.target.value = ""; }} />
+        </label>
+        <button className="secondary icon-action" type="button" aria-expanded={article}
+          onClick={() => setArticle(!article)}><LinkIcon size={18} aria-hidden="true" /> Artigo</button>
+      </>}
+      <button className="primary" disabled={busy}>{label}</button>
+    </div>
+    {emojiMenu && <div className="emoji-options" role="group" aria-label="Escolher emoji">
+      {emojis.map((emoji) => <button className="secondary" key={emoji} type="button" onClick={() => insertEmoji(emoji)}>{emoji}</button>)}
+    </div>}
     {error && <p className="notice error" role="alert">{error}</p>}
   </form>;
 }
 
-function initials(name: string) {
-  return name.trim().split(/\s+/).slice(0, 2).map((part) => [...part][0]).join("").toUpperCase();
-}
+type Person = { slug: string; name: string; institution: string; specialization: string; photo: string; common_keywords: string[] };
 
-export function ResearcherDiscovery() {
-  const { data, error } = useNetworkData<{ slug: string; name: string; institution: string; specialization: string }[]>("/profiles");
-  return <aside className="feed-discovery" aria-label="Descobrir investigadores">
-    <section className="panel">
+export function ResearcherDiscovery({ similarTo }: { similarTo?: string }) {
+  const path = "/profiles/discover/suggestions" + (similarTo ? `?similar_to=${similarTo}` : "");
+  const { data, error } = useNetworkData<Person[]>(path);
+
+  return <aside className="feed-discovery" aria-label={similarTo ? "Perfis semelhantes" : "Descobrir investigadores"}>
+    {!similarTo && <section className="panel discovery-search-panel">
       <h2>Encontrar pessoas</h2>
       <form action="/pessoas" className="feed-search">
         <label htmlFor="feed-search">Nome, instituição ou área</label>
         <input id="feed-search" name="q" type="search" maxLength={100} />
         <button className="secondary" type="submit">Pesquisar</button>
       </form>
-    </section>
+    </section>}
     <section className="panel">
-      <h2>Perfis públicos</h2>
-      {error ? <p className="muted">Perfis temporariamente indisponíveis.</p> :
+      <h2>{similarTo ? "Perfis semelhantes" : "Pessoas para seguir"}</h2>
+      {error ? <p className="muted">{error}</p> :
         !data ? <p className="muted" role="status">A carregar perfis…</p> :
-          !data.length ? <p className="muted">Ainda não há perfis públicos.</p> :
-            <ul className="feed-researchers">{data.slice(0, 5).map((person) => (
+          !data.length ? <p className="muted">Ainda não há sugestões.</p> :
+            <ul className="feed-researchers">{data.map((person) => (
               <li key={person.slug}>
-                <span className="feed-initials" aria-hidden="true">{initials(person.name)}</span>
+                <Avatar name={person.name} photo={person.photo} />
                 <div>
                   <Link href={`/u/${person.slug}`}>{person.name}</Link>
                   {(person.institution || person.specialization) && <small>{person.institution || person.specialization}</small>}
+                  <small>{person.common_keywords.join(", ") || "Investigador na SSciX"}</small>
+                  <FollowButton slug={person.slug} showCounts />
                 </div>
               </li>
             ))}</ul>}
@@ -100,26 +176,87 @@ export function ResearcherDiscovery() {
   </aside>;
 }
 
-function PostCard({ post, link }: { post: Post; link?: boolean }) {
+type Actions = { liked: boolean; saved: boolean; likes: number };
+
+function PostActions({ post, onChange }: { post: Post; onChange?: () => void }) {
+  const path = `/feed/${post.id}/actions`;
+  const [actions, setActions] = useState<Actions>({ liked: post.liked, saved: post.saved, likes: post.likes });
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
+
+  async function toggle(action: "like" | "save", value: boolean) {
+    setBusy(true);
+    setFeedback("");
+    try {
+      setActions(await api<Actions>(`${path}/${action}`, value ? "DELETE" : "PUT"));
+      if (action === "save" && value) onChange?.();
+    } catch (failure) {
+      setFeedback(message(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function share() {
+    const url = new URL(`/rede/${post.id}`, window.location.origin).href;
+    setFeedback("");
+    try {
+      await navigator.clipboard.writeText(url);
+      setFeedback("Ligação copiada.");
+    } catch {
+      setShareUrl(url);
+    }
+  }
+
+  return <>
+    <div className="post-actions">
+      <button type="button" aria-pressed={actions.liked} disabled={busy} onClick={() => void toggle("like", actions.liked)}>
+        <Heart size={18} aria-hidden="true" /> Gostar <span aria-label={`${actions.likes} gostos`}>{actions.likes}</span>
+      </button>
+      <Link href={`/rede/${post.id}#comentarios`}><MessageCircle size={18} aria-hidden="true" /> Comentar</Link>
+      <button type="button" onClick={() => void share()}><Forward size={18} aria-hidden="true" /> Partilhar</button>
+      <button type="button" aria-pressed={actions.saved} disabled={busy} onClick={() => void toggle("save", actions.saved)}>
+        <Bookmark size={18} aria-hidden="true" /> {actions.saved ? "Guardado" : "Guardar"}
+      </button>
+    </div>
+    {shareUrl && <label>Ligação para partilhar<input value={shareUrl} readOnly onFocus={(event) => event.currentTarget.select()} /></label>}
+    {feedback && <p className="muted" role="status">{feedback}</p>}
+  </>;
+}
+
+function PostCard({ post, topic, onChange }: { post: Post; topic?: boolean; onChange?: () => void }) {
   return <article className="panel network-post">
     <header>
       <div className="feed-author">
-        <span className="feed-initials" aria-hidden="true">{initials(post.author_name)}</span>
+        <Avatar name={post.author_name} photo={post.author_photo} />
         <Link href={`/u/${post.author_slug}`}><strong>{post.author_name}</strong></Link>
       </div>
       <time className="muted" dateTime={post.created_at}>{post.created_at.slice(0, 10)}</time>
     </header>
     {post.community_id && <Link href={`/comunidades/${post.community_id}`}>{post.community_name}</Link>}
     <p className="biography">{post.body}</p>
-    {link && <Link href={`/rede/${post.id}`}>Abrir debate</Link>}
+    {post.image && <img className="post-image" src={post.image} alt="Imagem anexada à publicação" loading="lazy" />}
+    {post.article_url && <a className="icon-action" href={post.article_url} rel="noopener noreferrer" target="_blank">
+      <LinkIcon size={17} aria-hidden="true" /> Abrir artigo
+    </a>}
+    {topic && <PostActions post={post} onChange={onChange} />}
   </article>;
 }
 
-function Posts({ data, error, empty, link }: { data?: Post[]; error: string; empty: string; link?: boolean }) {
+function Posts({ data, error, empty, topic, onChange }: {
+  data?: Post[]; error: string; empty: string; topic?: boolean; onChange?: () => void;
+}) {
   if (error) return <p className="notice error" role="alert">{error}</p>;
   if (!data) return <p role="status">A carregar…</p>;
   if (!data.length) return <p className="muted">{empty}</p>;
-  return data.map((post) => <PostCard key={post.id} post={post} link={link} />);
+  return data.map((post) => <PostCard key={post.id} post={post} topic={topic} onChange={onChange} />);
+}
+
+export function SavedPosts() {
+  const { data, error, refresh } = useNetworkData<Post[]>("/saved");
+  return <div className="network-stack"><Posts data={data} error={error}
+    empty="Ainda não guardou publicações." topic onChange={refresh} /></div>;
 }
 
 export function Feed({ communityId }: { communityId?: string }) {
@@ -136,7 +273,7 @@ export function Feed({ communityId }: { communityId?: string }) {
       <button className="secondary" aria-pressed={!following} onClick={() => setFollowing(false)}>Publicações recentes</button>
       <button className="secondary" aria-pressed={following} onClick={() => setFollowing(true)}>Pessoas que sigo</button>
     </div>}
-    <Posts data={data} error={error} empty="Ainda não há publicações para mostrar." link />
+    <Posts data={data} error={error} empty="Ainda não há publicações para mostrar." topic />
   </div>;
 }
 
@@ -147,10 +284,10 @@ export function Topic({ id }: { id: string }) {
   if (!topic.data) return <p role="status">A carregar o debate…</p>;
 
   return <div className="network-stack">
-    <PostCard post={topic.data} />
-    <h2>Respostas</h2>
+    <PostCard post={topic.data} topic />
+    <h2 id="comentarios">Comentários</h2>
     <Posts data={replies.data} error={replies.error} empty="Ainda não há respostas." />
-    <Composer endpoint={`/feed/${id}/replies`} label="Responder" onSaved={replies.refresh} />
+    <Composer endpoint={`/feed/${id}/replies`} label="Comentar" onSaved={replies.refresh} />
   </div>;
 }
 

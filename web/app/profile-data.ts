@@ -5,6 +5,12 @@ export const roles = {
   student: "Estudante",
 } as const;
 
+export type SocialLink = {
+  platform: "Facebook" | "Instagram" | "X" | "LinkedIn" | "Outra";
+  url: string;
+  public: boolean;
+};
+
 export type Profile = {
   name: string;
   slug: string;
@@ -19,6 +25,9 @@ export type Profile = {
   education: string;
   experience: string;
   publications: string;
+  photo: string;
+  keywords: string[];
+  social_links: SocialLink[];
   is_public: boolean;
 };
 

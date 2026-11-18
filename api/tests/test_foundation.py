@@ -133,7 +133,7 @@ def test_public_directory_and_follow_privacy(account, app_config):
                 "institution": data["slug"], "specialization": "",
             }]
             assert follower.put(follow, headers={"Origin": "http://other.example"}).status_code == 403
-            assert follower.put(follow).json() == {"following": True, "can_follow": True}
+            assert follower.put(follow).json() == {"following": True, "can_follow": True, "followers": 1, "following_count": 0}
             assert follower.put(follow).json()["following"] is True
             assert follower.delete(follow).json()["following"] is False
             assert follower.delete(follow).json()["following"] is False
@@ -190,3 +190,113 @@ def test_academic_network_and_trajectory(account):
     assert client.get(public).status_code == 404
     assert client.get(feed, params={"community_id": group_id}).json() == []
     assert client.get(replies).status_code == 404
+
+
+def test_social_workflow_permissions(account, app_config):
+    author, author_data, mailbox = account
+    app, origin = app_config
+    root = "/api/v1"
+
+    def sign_up(client, data, public=True):
+        assert client.post(f"{root}/auth/register", json=data).status_code == 202
+        assert client.post(f"{root}/auth/verify", json={
+            "token": mailbox["verify"], "password": data["password"],
+        }).status_code == 204
+        assert client.put(f"{root}/profiles/me/keywords", json={"keywords": ["Educação"]}).status_code == 204
+        profile = client.get(f"{root}/profiles/me").json()
+        profile.pop("email")
+        payload = {**profile, "is_public": public, "social_links": [
+            {"platform": "Outra", "url": "https://example.com/private", "public": False},
+        ]}
+        assert client.put(f"{root}/profiles/me", json=payload).status_code == 200
+        return payload
+
+    from app.db import SessionFactory
+    from app.models import User
+
+    reader_slug = "leitor-" + uuid4().hex[:12]
+    reader_email = f"{reader_slug}@example.com"
+    reader_data = {**author_data, "slug": reader_slug, "email": reader_email}
+    author_slug = author_data["slug"]
+    png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kv9sAAAAASUVORK5CYII="
+    try:
+        with TestClient(app, base_url=origin, headers={"Origin": origin}) as reader, \
+             TestClient(app, base_url=origin, headers={"Origin": origin}) as guest:
+            author_profile = sign_up(author, author_data)
+            sign_up(reader, reader_data, public=False)
+            profile_url = f"{root}/profiles/{author_slug}"
+            author_profile["photo"] = png
+            assert author.put(f"{root}/profiles/me", json=author_profile).status_code == 200
+            public = guest.get(profile_url).json()
+            assert public["social_links"] == []
+            assert guest.get(public["photo"]).headers["content-type"] == "image/png"
+            suggestions = reader.get(f"{root}/profiles/discover/suggestions").json()
+            suggestion = next(item for item in suggestions if item["slug"] == author_slug)
+            assert suggestion["common_keywords"] == ["Educação"]
+            assert reader.put(profile_url + "/follow").json()["followers"] == 1
+            assert all(item["slug"] != author_slug for item in reader.get(f"{root}/profiles/discover/suggestions").json())
+            publish = author.post(f"{root}/feed", json={
+                "body": f"Investigação em educação @{reader_slug}",
+                "article_url": "https://example.com/paper",
+                "image": png,
+            })
+            assert publish.status_code == 201
+            post = publish.json()
+            post_url = f"{root}/feed/{post['id']}"
+            assert guest.get(post["image"]).headers["content-type"] == "image/png"
+            assert reader.get(f"{root}/feed", params={"following": True}).json()[0]["id"] == post["id"]
+            assert reader.put(post_url + "/actions/like").json()["likes"] == 1
+            assert reader.put(post_url + "/actions/like").json()["likes"] == 1
+            assert reader.put(post_url + "/actions/save").json()["saved"]
+            assert reader.get(f"{root}/saved").json()[0]["id"] == post["id"]
+            assert author.get(f"{root}/saved").json() == []
+            assert guest.get(f"{root}/saved").status_code == 401
+            assert reader.get(f"{root}/notifications").json()[0]["topic_id"] == post["id"]
+            assert reader.put(f"{root}/notifications/{post['id']}/read").status_code == 204
+            assert reader.get(f"{root}/notifications").json()[0]["read"] is True
+
+            assert author.post(f"{root}/messages/{reader_slug}", json={"body": "Olá"}).status_code == 404
+            assert reader.post(f"{root}/messages/{author_slug}", json={"body": "Mensagem privada"}).status_code == 201
+            assert author.get(f"{root}/messages/{reader_slug}").json()["messages"][0]["body"] == "Mensagem privada"
+            assert reader.get(f"{root}/messages").json()[0]["slug"] == author_slug
+            assert guest.get(f"{root}/messages/{author_slug}").status_code == 401
+
+            assert author.put(f"{root}/profiles/me", json={**author_profile, "is_public": False}).status_code == 200
+            assert guest.get(post_url).status_code == 404
+            assert guest.get(post["image"]).status_code == 404
+            assert guest.get(public["photo"]).status_code == 404
+            assert reader.get(f"{root}/saved").json() == []
+            assert reader.get(f"{root}/notifications").json() == []
+            assert reader.get(f"{root}/messages/{author_slug}").json()["messages"][0]["body"] == "Mensagem privada"
+    finally:
+        with SessionFactory.begin() as db:
+            db.execute(delete(User).where(User.email == reader_email))
+
+
+def test_account_settings_keep_email_until_confirmation(account):
+    client, data, mailbox = account
+    root = "/api/v1"
+    previous_email = data["email"]
+    new_email = f"nova-{uuid4().hex[:12]}@example.com"
+    password = data["password"]
+    new_password = "Outra palavra-passe segura"
+    from app.db import SessionFactory
+    from app.models import User
+
+    try:
+        assert client.post(f"{root}/auth/register", json=data).status_code == 202
+        assert client.post(f"{root}/auth/verify", json={"token": mailbox["verify"], "password": password}).status_code == 204
+        assert client.post(f"{root}/auth/email", json={"email": new_email, "password": password}).status_code == 202
+        assert client.get(f"{root}/profiles/me").json()["email"] == previous_email
+        confirmation = {"token": mailbox["change-email"], "password": password}
+        assert client.post(f"{root}/auth/confirm-email-change", json=confirmation).status_code == 204
+        assert client.post(f"{root}/auth/confirm-email-change", json=confirmation).status_code == 400
+        assert client.get(f"{root}/profiles/me").json()["email"] == new_email
+        assert client.put(f"{root}/auth/password", json={"password": password, "new_password": new_password}).status_code == 204
+        assert client.post(f"{root}/auth/deactivate", json={"password": new_password}).status_code == 204
+        assert client.get(f"{root}/profiles/me").status_code == 401
+        assert client.post(f"{root}/auth/login", json={"email": new_email, "password": new_password}).status_code == 204
+        assert client.get(f"{root}/profiles/me").status_code == 200
+    finally:
+        with SessionFactory.begin() as db:
+            db.execute(delete(User).where(User.email == new_email))

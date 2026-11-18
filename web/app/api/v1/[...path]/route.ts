@@ -18,7 +18,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   let body: Uint8Array<ArrayBuffer> | undefined;
   if (request.body) {
     const reader = request.body.getReader();
-    const limit = request.method === "PUT" && path.join("/") === "profiles/me" ? 65536 : MAX_BODY;
+    const route = path.join("/");
+    const limit = request.method === "PUT" && route === "profiles/me" ? 425000
+      : request.method === "POST" && route === "feed" ? 750000 : MAX_BODY;
     const bytes = new Uint8Array(limit);
     let size = 0;
     while (true) {

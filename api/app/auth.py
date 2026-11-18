@@ -25,6 +25,7 @@ def get_user(db: DB, request: Request, *, for_update: bool = False) -> User:
         raise HTTPException(401, "Inicie sessão para continuar.")
     query = select(User).join(Session).where(
         Session.digest == digest(secret), Session.expires_at > now(), User.verified_at.is_not(None),
+        User.deactivated_at.is_(None),
     )
     user = db.scalar(query.with_for_update(of=User) if for_update else query)
     if user is None or (for_update and db.scalar(query) is None):
@@ -32,13 +33,13 @@ def get_user(db: DB, request: Request, *, for_update: bool = False) -> User:
     return user
 
 
-def issue_email_token(db: DatabaseSession, user: User, purpose: str) -> str:
+def issue_email_token(db: DatabaseSession, user: User, purpose: str, pending_email: str | None = None) -> str:
     db.execute(delete(EmailToken).where(
         EmailToken.user_id == user.id, EmailToken.expires_at <= now()
     ))
     secret = token()
     age = 86400 if purpose == "verify" else 1800
-    db.add(EmailToken(digest=digest(secret), user_id=user.id, purpose=purpose, expires_at=expires(age)))
+    db.add(EmailToken(digest=digest(secret), user_id=user.id, purpose=purpose, pending_email=pending_email, expires_at=expires(age)))
     return secret
 
 
@@ -90,13 +91,13 @@ def request_email(data: schemas.EmailInput, request: Request, db: DB):
 
 
 @router.post("/verify", status_code=204)
-def verify(data: schemas.ConfirmEmail, request: Request, db: DB):
+def verify(data: schemas.ConfirmEmail, request: Request, response: Response, db: DB):
     limit(request, "verify", 80)
     user = consume_email_token(db, data.token, "verify")
     if not password_matches(data.password, user.password_hash):
         raise HTTPException(403, "Introduza a palavra-passe usada no registo.")
     user.verified_at = now()
-    db.commit()
+    start_session(user, request, response, db)
 
 
 @router.post("/reset-password", status_code=204)
@@ -118,6 +119,11 @@ def login(data: schemas.Login, request: Request, response: Response, db: DB):
         raise HTTPException(401, "Email ou palavra-passe incorretos.")
     if user.verified_at is None:
         raise HTTPException(403, "Confirme o endereço de email antes de entrar.")
+    user.deactivated_at = None
+    start_session(user, request, response, db)
+
+
+def start_session(user: User, request: Request, response: Response, db: DB):
     previous = request.cookies.get(COOKIE, "")
     if len(previous) == 43:
         db.execute(delete(Session).where(Session.digest == digest(previous)))
@@ -144,5 +150,66 @@ def delete_account(data: schemas.DeleteAccount, request: Request, response: Resp
     if not password_matches(data.password, user.password_hash):
         raise HTTPException(403, "Palavra-passe incorreta.")
     db.delete(user)
+    db.commit()
+    clear_session(response)
+
+
+@router.put("/password", status_code=204)
+def change_password(data: schemas.ChangePassword, request: Request, response: Response, db: DB):
+    user = get_user(db, request, for_update=True)
+    limit(request, "settings-password", 8, str(user.id))
+    check_password(data.password, user)
+    user.password_hash = PASSWORDS.hash(data.new_password)
+    db.execute(delete(Session).where(Session.user_id == user.id))
+    db.execute(delete(EmailToken).where(EmailToken.user_id == user.id))
+    start_session(user, request, response, db)
+
+
+def check_password(password: str, user: User):
+    if not password_matches(password, user.password_hash):
+        raise HTTPException(403, "Palavra-passe incorrecta.")
+
+
+@router.post("/email", status_code=202)
+def change_email(data: schemas.ChangeEmail, request: Request, db: DB):
+    user = get_user(db, request, for_update=True)
+    email = str(data.email).lower()
+    limit(request, "settings-email", 5, str(user.id))
+    check_password(data.password, user)
+    if db.scalar(select(User.id).where(User.email == email)) is not None:
+        raise HTTPException(409, "Escolha outro endereço de email.")
+    db.execute(delete(EmailToken).where(EmailToken.user_id == user.id, EmailToken.purpose == "change-email"))
+    secret = issue_email_token(db, user, "change-email", email)
+    db.commit()
+    send_link(email, "change-email", secret)
+    return {"message": "Abra a ligação enviada ao novo endereço para confirmar a alteração."}
+
+
+@router.post("/confirm-email-change", status_code=204)
+def confirm_email_change(data: schemas.ConfirmEmail, request: Request, response: Response, db: DB):
+    limit(request, "settings-confirm-email", 30)
+    email = db.scalar(select(EmailToken.pending_email).where(EmailToken.digest == digest(data.token)))
+    user = consume_email_token(db, data.token, "change-email")
+    check_password(data.password, user)
+    if not email or user.deactivated_at is not None:
+        raise HTTPException(400, "O link é inválido ou expirou.")
+    user.email = email
+    db.execute(delete(Session).where(Session.user_id == user.id))
+    db.execute(delete(EmailToken).where(EmailToken.user_id == user.id))
+    try:
+        start_session(user, request, response, db)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Escolha outro endereço de email.") from None
+
+
+@router.post("/deactivate", status_code=204)
+def deactivate(data: schemas.DeleteAccount, request: Request, response: Response, db: DB):
+    user = get_user(db, request, for_update=True)
+    limit(request, "settings-deactivate", 8, str(user.id))
+    check_password(data.password, user)
+    user.deactivated_at = now()
+    db.execute(delete(Session).where(Session.user_id == user.id))
+    db.execute(delete(EmailToken).where(EmailToken.user_id == user.id))
     db.commit()
     clear_session(response)
