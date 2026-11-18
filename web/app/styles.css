@@ -141,3 +141,37 @@ dd { margin: 0; }
 .network-post header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: .8rem; }
 .network-post p { margin-top: .65rem; overflow-wrap: anywhere; }
 .network-stack button[aria-pressed="true"] { background: #daeee9; border-color: var(--teal); }
+
+body:has(.feed-shell) { background: #f2f6f4; }
+body:has(.feed-shell) .header-inner { min-height: 60px; }
+.feed-shell { padding-top: clamp(14px, 2vw, 26px); }
+.feed-masthead {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  border-bottom: 1px solid #cbdcd5;
+  margin-bottom: .85rem;
+  padding-bottom: .55rem;
+}
+.feed-masthead h1 { margin: 0; font-size: clamp(1.4rem, 2.25vw, 1.9rem); letter-spacing: -.035em; }
+.feed-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .44fr); gap: 1.2rem; }
+.feed-grid .panel { padding: clamp(13px, 1.7vw, 20px); border-radius: 12px; border-color: #d5e2dc; }
+.feed-grid .network-stack { gap: .65rem; }
+.feed-grid .network-composer { margin-top: 0; gap: .55rem; }
+.feed-grid .network-composer textarea { min-height: 68px; height: 68px; background: #f7faf8; }
+.feed-grid .network-composer button { justify-self: end; min-height: 36px; padding: .32em .9em; font-size: .9rem; }
+.feed-grid .network-composer .notice { margin-top: 0; }
+.feed-discovery h2 { font-size: 1.08rem; margin-bottom: .55rem; letter-spacing: -.015em; }
+.feed-discovery { display: grid; align-content: start; gap: 1rem; min-width: 0; }
+.feed-search { display: grid; gap: .55rem; justify-items: start; }
+.feed-researchers { list-style: none; padding: 0; margin: 0 0 .9rem; }
+.feed-researchers li { display: flex; align-items: center; gap: .62rem; padding: .65rem 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.feed-researchers small { display: block; }
+.feed-author { display: flex; align-items: center; gap: .65rem; overflow-wrap: anywhere; }
+.feed-initials { flex: 0 0 auto; display: grid; place-items: center; border-radius: .65rem; width: 2.4rem; height: 2.4rem; background: #def0e8; color: #18483c; font-weight: 750; }
+.feed-filters { display: flex; flex-wrap: wrap; gap: .55rem; }
+.feed-filters .secondary { border-radius: 2rem; min-height: 36px; padding: .32em .85em; font-size: .87rem; }
+@media (max-width: 740px) {
+  .feed-grid { grid-template-columns: minmax(0, 1fr); }
+  body:has(.feed-shell) .header-inner { padding-block: .55rem; }
+}
