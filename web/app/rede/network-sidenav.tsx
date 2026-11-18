@@ -1,4 +1,4 @@
-import { Bell, Bookmark, House, MessageSquare, Search, Settings, UserRound, Users } from "lucide-react";
+import { Bookmark, House, MessageSquare, Search, Settings, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 
 const shortcuts = [
@@ -7,7 +7,6 @@ const shortcuts = [
   ["/pessoas", "Encontrar pessoas", Search],
   ["/comunidades", "Comunidades", Users],
   ["/mensagens", "Mensagens", MessageSquare],
-  ["/notificacoes", "Notificações", Bell],
   ["/guardados", "Guardados", Bookmark],
   ["/definicoes", "Definições", Settings],
 ] as const;
