@@ -36,6 +36,9 @@ class Profile(Base):
     specialization: Mapped[str] = mapped_column(String(160), default="")
     interests: Mapped[str] = mapped_column(String(400), default="")
     biography: Mapped[str] = mapped_column(Text, default="")
+    education: Mapped[str] = mapped_column(Text, server_default="")
+    experience: Mapped[str] = mapped_column(Text, server_default="")
+    publications: Mapped[str] = mapped_column(Text, server_default="")
     orcid: Mapped[str] = mapped_column(String(19), default="")
     is_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
@@ -74,3 +77,23 @@ class Follow(Base):
     followed_id: Mapped[UUID] = mapped_column(
         ForeignKey("profiles.user_id", ondelete="CASCADE"), primary_key=True, index=True
     )
+
+
+class Community(Base):
+    __tablename__ = "communities"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    description: Mapped[str] = mapped_column(String(600))
+    owner_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"))
+
+
+class Discussion(Base):
+    __tablename__ = "discussions"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    author_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"), index=True)
+    community_id: Mapped[UUID | None] = mapped_column(ForeignKey("communities.id", ondelete="CASCADE"), index=True)
+    parent_id: Mapped[UUID | None] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

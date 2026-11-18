@@ -30,6 +30,8 @@ def update_profile(data: ProfileData, db: DB, request: Request):
     if profile.is_public and not data.is_public:
         db.execute(delete(Follow).where(Follow.followed_id == user.id))
     for key, value in data.model_dump().items():
+        if key in {"education", "experience", "publications"} and key not in data.model_fields_set:
+            continue
         setattr(profile, key, value)
     try:
         db.commit()

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import { api, message } from "../api-client";
-import { details, type Profile, roles } from "../profile-data";
+import { details, type Profile, roles, trajectory } from "../profile-data";
 
 type MyProfile = Profile & { email: string };
 
@@ -86,8 +86,11 @@ export default function ProfileEditor() {
             </label>)}
           </div>
           <label>Biografia académica<textarea name="biography" rows={5} maxLength={2000} defaultValue={profile.biography} /></label>
+          {trajectory.map(([field, label]) => (
+            <label key={field}>{label}<textarea name={field} rows={3} maxLength={2000} defaultValue={profile[field]} /></label>
+          ))}
           <label className="check"><input type="checkbox" name="is_public" defaultChecked={profile.is_public} />
-            <span>Tornar o perfil público. Os campos acima ficam visíveis a quem aceder ao endereço.</span>
+            <span>Tornar o perfil público. O perfil e as suas publicações ficam visíveis na rede académica.</span>
           </label>
           <div className="profile-actions"><button className="primary" disabled={busy}>Guardar perfil</button>
             {profile.is_public && <Link href={`/u/${profile.slug}`}>Ver perfil público ↗</Link>}</div>

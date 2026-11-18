@@ -7,10 +7,11 @@ export default function Home() {
         <div className="hero-copy">
           <a className="parent-brand" href="https://www.sussurrosdosaber.com/">Sussurros do Saber</a>
           <h1>Ciência que conecta pessoas e transforma conhecimento.</h1>
-          <p>Crie o seu perfil académico e apresente a sua afiliação, interesses e áreas de investigação.</p>
+          <p>Apresente a sua trajectória académica, encontre investigadores e participe em debates de investigação.</p>
           <div className="hero-actions">
             <Link href="/registar" className="primary">Criar conta <span aria-hidden="true">→</span></Link>
             <Link href="/entrar" className="secondary">Entrar</Link>
+            <Link href="/rede" className="secondary">Explorar a rede</Link>
           </div>
         </div>
         <div className="atlas" aria-hidden="true">

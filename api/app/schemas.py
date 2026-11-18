@@ -60,6 +60,9 @@ class ProfileData(Input):
     specialization: str = Field(default="", max_length=160)
     interests: str = Field(default="", max_length=400)
     biography: str = Field(default="", max_length=2000)
+    education: str = Field(default="", max_length=2000)
+    experience: str = Field(default="", max_length=2000)
+    publications: str = Field(default="", max_length=2000)
     orcid: str = Field(default="", pattern=r"^(?:[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X])?$")
     is_public: bool = False
 

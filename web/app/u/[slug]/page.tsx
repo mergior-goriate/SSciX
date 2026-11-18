@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import FollowButton from "./follow-button";
-import { details, type Profile, roles } from "../../profile-data";
+import { details, type Profile, roles, trajectory } from "../../profile-data";
 
 const loadProfile = cache(async (slug: string): Promise<Profile> => {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length < 3 || slug.length > 40) notFound();
@@ -32,6 +32,12 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
         <dl>{details.filter(([key]) => profile[key]).map(([key, label]) => (
           <div key={key}><dt>{label}</dt><dd>{profile[key]}</dd></div>
         ))}</dl>
+        {trajectory.filter(([field]) => profile[field]).map(([field, label]) => (
+          <section key={field}>
+            <h2>{label}</h2>
+            <p className="biography">{profile[field]}</p>
+          </section>
+        ))}
       </article>
     </main>
   );
