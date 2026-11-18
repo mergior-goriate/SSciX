@@ -64,3 +64,13 @@ class RateLimit(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     window: Mapped[int] = mapped_column(Integer, primary_key=True)
     attempts: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class Follow(Base):
+    __tablename__ = "follows"
+    __table_args__ = (CheckConstraint("follower_id <> followed_id", name="follow_distinct_users"),)
+
+    follower_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"), primary_key=True)
+    followed_id: Mapped[UUID] = mapped_column(
+        ForeignKey("profiles.user_id", ondelete="CASCADE"), primary_key=True, index=True
+    )

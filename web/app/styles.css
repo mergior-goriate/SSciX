@@ -25,6 +25,7 @@ h2 { font-size: 1.45rem; margin-bottom: .8em; }
 .site-width { width: min(1160px, calc(100% - 48px)); margin-inline: auto; }
 .site-header { background: var(--paper); border-bottom: 1px solid var(--line); }
 .header-inner { display: flex; justify-content: space-between; align-items: center; min-height: 76px; }
+.header-inner nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem 1.25rem; }
 .header-inner nav a { color: var(--ink); font-size: .91rem; font-weight: 650; text-decoration: none; }
 .header-inner nav a:hover { text-decoration: underline; }
 .wordmark { display: flex; align-items: center; gap: .7rem; font-size: 1.55rem; font-weight: 820; letter-spacing: -.05em; color: var(--ink); text-decoration: none; }
@@ -127,3 +128,9 @@ dd { margin: 0; }
   dl > div { gap: 4px; }
   .hero-copy { padding: 28px 22px; }
 }
+
+.people-directory form { display: grid; justify-items: start; gap: .65rem; margin-bottom: 1.5rem; }
+.people-directory ul { list-style: none; padding: 0; }
+.people-directory li { border-top: 1px solid var(--line); padding: .75rem 0; }
+.people-directory li a { font-weight: 650; }
+.people-directory li p { margin: .3rem 0 0; }

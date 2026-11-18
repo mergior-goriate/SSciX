@@ -90,3 +90,60 @@ def test_origin_and_validation(account):
     assert "curta" not in response.text
     assert response.json()["fields"] == ["password"]
     assert mailbox == {}
+
+
+def test_public_directory_and_follow_privacy(account, app_config):
+    owner, data, mailbox = account
+    app, origin = app_config
+    root = "/api/v1"
+    own = f"{root}/profiles/me"
+    directory = f"{root}/profiles"
+    follow = f"{directory}/{data['slug']}/follow"
+    follower_slug = f"leitor-{uuid4().hex[:12]}"
+    follower_data = {**data, "slug": follower_slug, "email": f"{follower_slug}@example.com"}
+
+    def sign_in(client, registration):
+        credentials = {key: registration[key] for key in ("email", "password")}
+        assert client.post(f"{root}/auth/register", json=registration).status_code == 202
+        assert client.post(f"{root}/auth/verify", json={
+            "token": mailbox["verify"], "password": registration["password"],
+        }).status_code == 204
+        assert client.post(f"{root}/auth/login", json=credentials).status_code == 204
+
+    sign_in(owner, data)
+    profile = owner.get(own).json()
+    profile.pop("email")
+    public_profile = {**profile, "is_public": True, "institution": data["slug"]}
+    search = {"q": data["slug"]}
+
+    from app.db import SessionFactory
+    from app.models import User
+
+    try:
+        with TestClient(app, base_url=origin, headers={"Origin": origin}) as follower:
+            assert follower.get(follow).status_code == 401
+            sign_in(follower, follower_data)
+            assert follower.put(follow).status_code == 404
+            assert follower.get(directory, params=search).json() == []
+
+            assert owner.put(own, json=public_profile).status_code == 200
+            assert owner.put(follow).status_code == 400
+            assert follower.get(directory, params=search).json() == [{
+                "slug": data["slug"], "name": data["name"],
+                "institution": data["slug"], "specialization": "",
+            }]
+            assert follower.put(follow, headers={"Origin": "http://other.example"}).status_code == 403
+            assert follower.put(follow).json() == {"following": True, "can_follow": True}
+            assert follower.put(follow).json()["following"] is True
+            assert follower.delete(follow).json()["following"] is False
+            assert follower.delete(follow).json()["following"] is False
+            assert follower.put(follow).json()["following"] is True
+
+            assert owner.put(own, json={**public_profile, "is_public": False}).status_code == 200
+            assert follower.get(directory, params=search).json() == []
+            assert follower.get(follow).status_code == 404
+            assert owner.put(own, json=public_profile).status_code == 200
+            assert follower.get(follow).json()["following"] is False
+    finally:
+        with SessionFactory.begin() as db:
+            db.execute(delete(User).where(User.email == follower_data["email"]))

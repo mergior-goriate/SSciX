@@ -18,6 +18,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <span>SSci<span className="accent">X</span></span>
             </Link>
             <nav aria-label="Navegação principal">
+              <Link href="/pessoas">Encontrar pessoas</Link>
               <Link href="/perfil">Meu perfil</Link>
             </nav>
           </div>
