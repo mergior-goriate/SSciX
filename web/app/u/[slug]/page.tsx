@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
+import FollowButton from "./follow-button";
 import { details, type Profile, roles } from "../../profile-data";
 
 const loadProfile = cache(async (slug: string): Promise<Profile> => {
@@ -26,6 +27,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
           <div className="initials" aria-hidden="true">{initials}</div>
           <div><h1>{profile.name}</h1><p className="muted">{roles[profile.academic_role]}</p></div>
         </div>
+        <FollowButton key={profile.slug} slug={profile.slug} />
         {profile.biography && <p className="biography">{profile.biography}</p>}
         <dl>{details.filter(([key]) => profile[key]).map(([key, label]) => (
           <div key={key}><dt>{label}</dt><dd>{profile[key]}</dd></div>
