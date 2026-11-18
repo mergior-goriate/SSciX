@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Bookmark, CircleHelp, Home, LogOut, Menu, MessageSquare, Search, Settings, UserRound, Users } from "lucide-react";
+import { Bell, Bookmark, CircleHelp, Home, LogOut, Menu, MessageSquare, Settings, UserRound, Users } from "lucide-react";
 import { useRef, useState } from "react";
 import { api, message } from "./api-client";
 
 const links = [
   ["/rede", "Início", Home],
-  ["/pessoas", "Pesquisa", Search],
   ["/comunidades", "Comunidades", Users],
   ["/notificacoes", "Notificações", Bell],
   ["/mensagens", "Mensagens", MessageSquare],
