@@ -147,3 +147,46 @@ def test_public_directory_and_follow_privacy(account, app_config):
     finally:
         with SessionFactory.begin() as db:
             db.execute(delete(User).where(User.email == follower_data["email"]))
+
+
+def test_academic_network_and_trajectory(account):
+    client, data, mailbox = account
+    root = "/api/v1"
+    own = f"{root}/profiles/me"
+    feed = f"{root}/feed"
+    communities = f"{root}/communities"
+    assert client.post(feed, json={"body": "Convite de investigação"}).status_code == 401
+    assert client.post(f"{root}/auth/register", json=data).status_code == 202
+    assert client.post(f"{root}/auth/verify", json={
+        "token": mailbox["verify"], "password": data["password"],
+    }).status_code == 204
+    assert client.post(f"{root}/auth/login", json={
+        "email": data["email"], "password": data["password"],
+    }).status_code == 204
+    assert client.post(feed, json={"body": "Convite de investigação"}).status_code == 403
+    profile = client.get(own).json()
+    profile.pop("email")
+    profile.update(is_public=True, education="Mestrado em Educação", publications="Comunicação em conferência")
+    assert client.put(own, json=profile).status_code == 200
+    public = f"{root}/profiles/{data['slug']}"
+    assert client.get(public).json()["education"] == profile["education"]
+    old_client = {key: value for key, value in profile.items() if key not in {"education", "experience", "publications"}}
+    assert client.put(own, json=old_client).json()["education"] == profile["education"]
+
+    group = client.post(communities, json={"name": data["slug"], "description": "Colaboração em educação"})
+    assert group.status_code == 201
+    group_id = group.json()["id"]
+    assert client.get(f"{communities}/{group_id}").status_code == 200
+    post = client.post(feed, json={"body": "Convite de investigação", "community_id": group_id})
+    assert post.status_code == 201
+    post_id = post.json()["id"]
+    assert [entry["id"] for entry in client.get(feed, params={"community_id": group_id}).json()] == [post_id]
+    assert client.get(feed, params={"following": True}).json() == []
+    replies = f"{feed}/{post_id}/replies"
+    assert client.post(replies, json={"body": "Quero colaborar."}).status_code == 201
+    assert [entry["body"] for entry in client.get(replies).json()] == ["Quero colaborar."]
+
+    assert client.put(own, json={**profile, "is_public": False}).status_code == 200
+    assert client.get(public).status_code == 404
+    assert client.get(feed, params={"community_id": group_id}).json() == []
+    assert client.get(replies).status_code == 404

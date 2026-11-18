@@ -18,12 +18,13 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   let body: Uint8Array<ArrayBuffer> | undefined;
   if (request.body) {
     const reader = request.body.getReader();
-    const bytes = new Uint8Array(MAX_BODY);
+    const limit = request.method === "PUT" && path.join("/") === "profiles/me" ? 65536 : MAX_BODY;
+    const bytes = new Uint8Array(limit);
     let size = 0;
     while (true) {
       const chunk = await reader.read();
       if (chunk.done) break;
-      if (size + chunk.value.length > MAX_BODY) {
+      if (size + chunk.value.length > limit) {
         await reader.cancel();
         return Response.json({ detail: "O pedido é demasiado grande." }, { status: 413 });
       }

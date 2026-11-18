@@ -16,6 +16,9 @@ export type Profile = {
   interests: string;
   biography: string;
   orcid: string;
+  education: string;
+  experience: string;
+  publications: string;
   is_public: boolean;
 };
 
@@ -26,4 +29,10 @@ export const details = [
   ["specialization", "Área de especialização", 160],
   ["interests", "Interesses de investigação", 400],
   ["orcid", "ORCID", 19],
+] as const;
+
+export const trajectory = [
+  ["education", "Formação académica"],
+  ["experience", "Experiência e projectos"],
+  ["publications", "Publicações e contribuições"],
 ] as const;

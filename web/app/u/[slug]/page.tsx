@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import FollowButton from "./follow-button";
-import { details, type Profile, roles } from "../../profile-data";
+import { details, type Profile, roles, trajectory } from "../../profile-data";
 
 const loadProfile = cache(async (slug: string): Promise<Profile> => {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length < 3 || slug.length > 40) notFound();

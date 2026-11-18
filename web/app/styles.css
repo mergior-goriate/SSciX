@@ -134,3 +134,10 @@ dd { margin: 0; }
 .people-directory li { border-top: 1px solid var(--line); padding: .75rem 0; }
 .people-directory li a { font-weight: 650; }
 .people-directory li p { margin: .3rem 0 0; }
+
+.network-shell { max-width: 800px; }
+.network-stack { display: grid; gap: 1rem; }
+.network-stack h2 { margin-bottom: .25rem; }
+.network-post header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: .8rem; }
+.network-post p { margin-top: .65rem; overflow-wrap: anywhere; }
+.network-stack button[aria-pressed="true"] { background: #daeee9; border-color: var(--teal); }
