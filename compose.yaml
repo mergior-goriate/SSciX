@@ -1,0 +1,48 @@
+name: sscix
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: sscix
+      POSTGRES_USER: sscix
+      POSTGRES_PASSWORD: sscix-local-only
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sscix -d sscix"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  mail:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:8025:8025"
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: postgresql+psycopg://sscix:sscix-local-only@db:5432/sscix
+      APP_ORIGIN: http://localhost:3000
+      SMTP_HOST: mail
+      SMTP_PORT: "1025"
+    depends_on:
+      db:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  web:
+    build: ./web
+    environment:
+      API_INTERNAL_URL: http://api:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  db-data:
