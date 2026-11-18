@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Bookmark, CircleHelp, Home, LogOut, Menu, MessageSquare, Settings, UserRound } from "lucide-react";
-import { useRef, useState } from "react";
+import { Bookmark, CircleHelp, Home, LogOut, Menu, MessageSquare, Settings, UserRound } from "lucide-react";
+import { Fragment, useRef, useState } from "react";
 import { api, message } from "./api-client";
+import NotificationPopover from "./notificacoes/notification-popover";
 
 const links = [
   ["/rede", "Início", Home],
-  ["/notificacoes", "Notificações", Bell],
   ["/mensagens", "Mensagens", MessageSquare],
   ["/perfil", "Perfil", UserRound],
 ] as const;
@@ -37,9 +37,12 @@ export default function Navigation() {
   return <nav aria-label="Navegação principal" className="main-navigation">
     {links.map(([href, label, Icon]) => {
       const active = pathname === href || pathname.startsWith(href + "/");
-      return <Link key={href} href={href} aria-label={label} title={label} aria-current={active ? "page" : undefined}>
-        <Icon size={21} aria-hidden="true" />
-      </Link>;
+      return <Fragment key={href}>
+        {href === "/mensagens" && <NotificationPopover />}
+        <Link href={href} aria-label={label} title={label} aria-current={active ? "page" : undefined}>
+          <Icon size={21} aria-hidden="true" />
+        </Link>
+      </Fragment>;
     })}
     <details ref={menu} className="navigation-menu">
       <summary aria-label="Abrir menu" title="Abrir menu"><Menu size={21} aria-hidden="true" /></summary>

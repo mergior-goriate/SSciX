@@ -84,7 +84,7 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await page.goto("/rede");
     expect(await page.locator(".network-layout").evaluate((layout) =>
       getComputedStyle(layout).gridTemplateColumns.split(" ").length)).toBe(3);
-    await page.getByLabel("Criar publicação").fill("Primeira publicação académica.");
+    await page.getByLabel("Criar publicação").fill(`Primeira publicação académica. @${peerSlug}`);
     await page.getByRole("button", { name: "Publicar", exact: true }).click();
     await expect(page.getByText("Primeira publicação académica.")).toBeVisible();
     const recommendation = page.getByRole("listitem").filter({ hasText: "Célia Chissano" });
@@ -105,6 +105,23 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await expect(visitor.getByText("Olá, Célia. Vamos colaborar?")).toBeVisible();
     await visitor.goto(route);
     await expect(visitor.getByText("Primeira publicação académica.")).toBeVisible();
+    const notificationTrigger = visitor.getByRole("button", { name: "Notificações", exact: true });
+    await notificationTrigger.click();
+    const notificationPanel = visitor.getByRole("region", { name: "Notificações" });
+    await expect(notificationPanel).toBeVisible();
+    await expect(visitor).toHaveURL(route);
+    await notificationPanel.getByRole("button", { name: "Não lidas" }).click();
+    await expect(notificationPanel.getByRole("link", { name: /Ana Mateus/ })).toBeVisible();
+    await notificationPanel.getByRole("button", { name: "Marcar como lida" }).click();
+    await expect(notificationPanel.getByText("Não tem notificações por ler.")).toBeVisible();
+    await notificationPanel.getByRole("button", { name: "Todas" }).click();
+    await expect(notificationPanel.getByRole("link", { name: /Ana Mateus/ })).toBeVisible();
+    await visitor.keyboard.press("Escape");
+    await expect(notificationPanel).toBeHidden();
+    await notificationTrigger.click();
+    await notificationPanel.getByRole("link", { name: "Ver tudo" }).click();
+    await expect(visitor).toHaveURL(/\/notificacoes$/);
+    await expect(notificationPanel).toBeHidden();
     await page.goto("/perfil");
     await page.getByRole("checkbox", { name: /Tornar o perfil público/ }).uncheck();
     await page.getByRole("button", { name: "Guardar perfil" }).click();

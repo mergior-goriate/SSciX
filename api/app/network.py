@@ -265,7 +265,7 @@ def notifications(db: DB, request: Request):
         .order_by(Discussion.created_at.desc(), Discussion.id).limit(40)
     )
     return [
-        {"id": post.id, "topic_id": post.parent_id or post.id, "author_name": author.name,
+        {"id": post.id, "topic_id": post.parent_id or post.id, "author_name": author.name, "author_photo": photo_url(author),
          "created_at": post.created_at, "read": mention.read_at is not None}
         for mention, post, author in db.execute(query)
     ]
