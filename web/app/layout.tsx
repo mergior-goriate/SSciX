@@ -17,6 +17,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <span className="mark" aria-hidden="true"><i /><i /><i /></span>
               <span>SSci<span className="accent">X</span></span>
             </Link>
+            <form action="/pessoas" className="header-research-search" role="search">
+              <input name="q" type="search" aria-label="Pesquisar investigadores" placeholder="Nome, instituição ou área" maxLength={100} required />
+              <button className="secondary" type="submit">Pesquisar</button>
+            </form>
             <nav aria-label="Navegação principal">
               <Link href="/rede">Rede académica</Link>
               <Link href="/comunidades">Comunidades</Link>

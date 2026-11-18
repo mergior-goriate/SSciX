@@ -1,15 +1,19 @@
 /* Cores da marca Sussurros do Saber. */
 :root {
   color-scheme: light;
-  --background: #f8f8f8;
+  --background: #f2f7fb;
   --paper: #fff;
-  --ink: #101820;
-  --muted: #526171;
-  --line: #d6dce3;
-  --brand: #1e4e8c;
-  --brand-deep: #153967;
-  --brand-light: #6fa7e8;
-  --brand-wash: #e8f1fc;
+  --ink: #001d39;
+  --muted: #3c5770;
+  --line: #cbdce8;
+  --brand: #0a4174;
+  --brand-deep: #001d39;
+  --brand-light: #7bbde8;
+  --brand-wash: #e8f2f8;
+  --blue-mid: #49769f;
+  --blue-teal: #4e8ea2;
+  --blue-muted: #6ea2b3;
+  --blue-pale: #bdd8e9;
   --coral: #b2352b;
 }
 * { box-sizing: border-box; }
@@ -27,7 +31,11 @@ h1, h2 { line-height: 1.12; letter-spacing: -.04em; }
 h1 { font-size: clamp(2rem, 5vw, 3rem); margin-bottom: .42em; }
 h2 { font-size: 1.45rem; margin-bottom: .8em; }
 .site-width { width: min(1160px, calc(100% - 48px)); margin-inline: auto; }
-.site-header { background: var(--paper); border-bottom: 1px solid var(--line); }
+.site-header { background: var(--brand-deep); border-bottom: 3px solid var(--blue-mid); }
+.site-header .wordmark, .site-header .header-inner nav a { color: white; }
+.site-header .accent { color: var(--brand-light); }
+.site-header .mark { background: var(--brand); }
+.site-header :focus-visible { outline-color: var(--brand-light); }
 .header-inner { display: flex; justify-content: space-between; align-items: center; min-height: 76px; }
 .header-inner nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem 1.25rem; }
 .header-inner nav a { color: var(--ink); font-size: .91rem; font-weight: 650; text-decoration: none; }
@@ -70,7 +78,7 @@ h2 { font-size: 1.45rem; margin-bottom: .8em; }
 button:disabled { opacity: .62; cursor: default; }
 .atlas {
   position: absolute; right: -6%; inset-block: 0; width: 60%;
-  background: radial-gradient(ellipse at 58% 52%, #3269a9 0%, #1e4e8c 32%, transparent 68%);
+  background: radial-gradient(ellipse at 58% 52%, #3269a9 0%, #0a4174 32%, transparent 68%);
   pointer-events: none;
 }
 .atlas::before {
@@ -82,7 +90,7 @@ button:disabled { opacity: .62; cursor: default; }
 .orbit-one { transform: translate(-50%, -50%) rotate(-32deg); }
 .orbit-two { transform: translate(-50%, -50%) rotate(33deg); }
 .orbit-three { transform: translate(-50%, -50%) rotate(88deg); }
-.orbit-core { position: absolute; left: 54%; top: 50%; width: 90px; height: 90px; transform: translate(-50%, -50%); border-radius: 50%; border: 1px solid #a5cbf5b0; box-shadow: 0 0 45px #6fa7e844, inset 0 0 45px #6fa7e855; }
+.orbit-core { position: absolute; left: 54%; top: 50%; width: 90px; height: 90px; transform: translate(-50%, -50%); border-radius: 50%; border: 1px solid #a5cbf5b0; box-shadow: 0 0 45px #7bbde844, inset 0 0 45px #7bbde855; }
 .star { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--brand-light); box-shadow: 0 0 16px #a5cbf5; }
 .star-one { left: 26%; top: 63%; }
 .star-two { left: 81%; top: 64%; }
@@ -157,7 +165,18 @@ body:has(.feed-shell) .header-inner { min-height: 60px; }
   padding-bottom: .55rem;
 }
 .feed-masthead h1 { margin: 0; font-size: clamp(1.4rem, 2.25vw, 1.9rem); letter-spacing: -.035em; }
-.feed-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .44fr); gap: 1.2rem; }
+.feed-grid { display: grid; grid-template-columns: 176px minmax(0, 1fr) minmax(238px, .48fr); gap: 1rem; align-items: start; }
+.feed-main { min-width: 0; }
+.feed-grid .feed-navigation { display: grid; padding: .55rem; }
+.feed-navigation a { padding: .62rem .72rem; border-radius: 7px; text-decoration: none; font-size: .88rem; font-weight: 650; color: var(--ink); }
+.feed-navigation a:hover, .feed-navigation a[aria-current="page"] { background: var(--brand-wash); color: var(--brand); }
+@media (min-width: 981px) {
+  body:has(.feed-shell) .header-inner nav { display: none; }
+}
+@media (max-width: 980px) {
+  .feed-grid { grid-template-columns: minmax(0, 1fr) minmax(230px, .48fr); }
+  .feed-grid .feed-navigation { display: none; }
+}
 .feed-grid .panel { padding: clamp(13px, 1.7vw, 20px); border-radius: 12px; border-color: var(--line); }
 .feed-grid .network-stack { gap: .65rem; }
 .feed-grid .network-composer { margin-top: 0; gap: .55rem; }
@@ -177,4 +196,33 @@ body:has(.feed-shell) .header-inner { min-height: 60px; }
 @media (max-width: 740px) {
   .feed-grid { grid-template-columns: minmax(0, 1fr); }
   body:has(.feed-shell) .header-inner { padding-block: .55rem; }
+}
+
+.scholar-header { padding: 0; overflow: clip; }
+.scholar-cover {
+  min-height: clamp(90px, 18vw, 200px);
+  background:
+    radial-gradient(ellipse at 86% 0%, var(--blue-pale), transparent 51%),
+    linear-gradient(115deg, var(--brand-deep), var(--blue-mid) 48%, var(--blue-teal) 74%, var(--blue-muted));
+}
+.scholar-identity { display: flex; flex-wrap: wrap; align-items: center; gap: .85rem; padding: .9rem clamp(15px, 4vw, 36px); }
+.scholar-identity .initials { flex-basis: clamp(55px, 9vw, 82px); margin-top: -.9rem; border: 3px solid white; background: var(--blue-pale); }
+.scholar-identity h1 { margin: 0 0 .2rem; font-size: clamp(1.55rem, 4vw, 2.5rem); overflow-wrap: anywhere; }
+.scholar-identity p { margin: 0; }
+.scholar-identity > :last-child { margin-inline-start: auto; }
+.scholar-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
+.scholar-grid:has(> :nth-child(2)) { grid-template-columns: minmax(0, .65fr) minmax(0, 1fr); align-items: start; }
+.scholar-trajectory section + section { border-top: 1px solid var(--line); padding-top: .8rem; }
+.scholar-trajectory h3 { font-size: 1rem; margin: .4rem 0; }
+.scholar-shell .biography { overflow-wrap: anywhere; }
+@media (max-width: 740px) {
+  .scholar-grid:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr); }
+}
+
+.header-research-search { display: none; }
+@media (min-width: 981px) {
+  body:has(.feed-shell) .header-research-search { display: flex; gap: .55rem; width: min(48%, 460px); }
+  body:has(.feed-shell) .header-research-search input { min-height: 36px; }
+  body:has(.feed-shell) .header-research-search button { min-height: 36px; background: var(--blue-pale); color: var(--ink); }
+  .feed-discovery .panel:has(.feed-search) { display: none; }
 }

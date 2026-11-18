@@ -20,25 +20,45 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const profile = await loadProfile((await params).slug);
   const initials = profile.name.split(/\s+/).slice(0, 2).map((part) => [...part][0]).join("");
+  const affiliations = details.filter(([key]) => profile[key]);
+  const milestones = trajectory.filter(([field]) => profile[field]);
+  const hasTrajectory = Boolean(profile.biography || milestones.length);
+
   return (
-    <main className="site-width profile-shell">
-      <article className="panel public-profile">
-        <div className="public-heading">
+    <main className="site-width profile-shell scholar-shell">
+      <article className="panel scholar-header">
+        <div className="scholar-cover" aria-hidden="true" />
+        <div className="scholar-identity">
           <div className="initials" aria-hidden="true">{initials}</div>
-          <div><h1>{profile.name}</h1><p className="muted">{roles[profile.academic_role]}</p></div>
+          <div>
+            <h1>{profile.name}</h1>
+            <p className="muted">{[roles[profile.academic_role], profile.institution].filter(Boolean).join(" · ")}</p>
+          </div>
+          <FollowButton key={profile.slug} slug={profile.slug} />
         </div>
-        <FollowButton key={profile.slug} slug={profile.slug} />
-        {profile.biography && <p className="biography">{profile.biography}</p>}
-        <dl>{details.filter(([key]) => profile[key]).map(([key, label]) => (
-          <div key={key}><dt>{label}</dt><dd>{profile[key]}</dd></div>
-        ))}</dl>
-        {trajectory.filter(([field]) => profile[field]).map(([field, label]) => (
-          <section key={field}>
-            <h2>{label}</h2>
-            <p className="biography">{profile[field]}</p>
-          </section>
-        ))}
       </article>
+      <div className="scholar-grid">
+        {affiliations.length > 0 && (
+          <section className="panel public-profile">
+            <h2>Informação académica</h2>
+            <dl>{affiliations.map(([key, label]) => (
+              <div key={key}><dt>{label}</dt><dd>{profile[key]}</dd></div>
+            ))}</dl>
+          </section>
+        )}
+        {hasTrajectory && (
+          <section className="panel scholar-trajectory">
+            <h2>Trajectória académica</h2>
+            {profile.biography && <p className="biography">{profile.biography}</p>}
+            {milestones.map(([field, label]) => (
+              <section key={field}>
+                <h3>{label}</h3>
+                <p className="biography">{profile[field]}</p>
+              </section>
+            ))}
+          </section>
+        )}
+      </div>
     </main>
   );
 }
