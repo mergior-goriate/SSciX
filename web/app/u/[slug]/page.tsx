@@ -32,6 +32,12 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
         <dl>{details.filter(([key]) => profile[key]).map(([key, label]) => (
           <div key={key}><dt>{label}</dt><dd>{profile[key]}</dd></div>
         ))}</dl>
+        {trajectory.filter(([field]) => profile[field]).map(([field, label]) => (
+          <section key={field}>
+            <h2>{label}</h2>
+            <p className="biography">{profile[field]}</p>
+          </section>
+        ))}
       </article>
     </main>
   );
