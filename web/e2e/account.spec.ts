@@ -64,6 +64,8 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await expect(visitor.getByText("Universidade de ensaio", { exact: true })).toBeVisible();
     await expect(visitor.getByText(email)).toHaveCount(0);
     expect(await visitor.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    expect(await visitor.locator(".network-layout").evaluate((layout) =>
+      getComputedStyle(layout).gridTemplateColumns.split(" ").length)).toBe(1);
     const peerSlug = `celia-${id}`;
     const peerEmail = `${peerSlug}@example.com`;
     const origin = new URL(page.url()).origin;
@@ -80,6 +82,8 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
       headers, data: { ...peerProfile, keywords: ["Educação"], is_public: true },
     })).status()).toBe(200);
     await page.goto("/rede");
+    expect(await page.locator(".network-layout").evaluate((layout) =>
+      getComputedStyle(layout).gridTemplateColumns.split(" ").length)).toBe(3);
     await page.getByLabel("Criar publicação").fill("Primeira publicação académica.");
     await page.getByRole("button", { name: "Publicar", exact: true }).click();
     await expect(page.getByText("Primeira publicação académica.")).toBeVisible();
@@ -95,6 +99,8 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await visitor.goto(origin + "/mensagens");
     await visitor.getByRole("link", { name: "Ana Mateus" }).click();
     await expect(visitor.getByText("Olá, Célia. Vamos colaborar?")).toBeVisible();
+    await visitor.goto(route);
+    await expect(visitor.getByText("Primeira publicação académica.")).toBeVisible();
     await page.goto("/perfil");
     await page.getByRole("checkbox", { name: /Tornar o perfil público/ }).uncheck();
     await page.getByRole("button", { name: "Guardar perfil" }).click();

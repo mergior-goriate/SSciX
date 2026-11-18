@@ -12,7 +12,7 @@ from sqlalchemy.orm import aliased
 from .auth import DB, get_user
 from .models import Bookmark, Community, Discussion, Follow, Mention, Profile, Reaction, User
 from .profiles import image_response, photo_url
-from .schemas import Input, Name, image_data, web_url
+from .schemas import Input, Name, Slug, image_data, web_url
 from .security import limit, now, require_origin
 
 router = APIRouter(tags=["rede académica"])
@@ -130,11 +130,13 @@ def optional_viewer(db: DB, request: Request):
 
 
 @router.get("/feed", response_model=list[PostView])
-def feed(db: DB, request: Request, following: bool = False, community_id: UUID | None = None):
+def feed(db: DB, request: Request, following: bool = False, community_id: UUID | None = None, author: Slug | None = None):
     conditions = [Discussion.parent_id.is_(None)]
     viewer = get_user(db, request).id if following else optional_viewer(db, request)
     if following:
         conditions.append(Discussion.author_id.in_(select(Follow.followed_id).where(Follow.follower_id == viewer)))
+    if author is not None:
+        conditions.append(Profile.slug == author)
     if community_id is not None:
         community(community_id, db)
         conditions.append(Discussion.community_id == community_id)
