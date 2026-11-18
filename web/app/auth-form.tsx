@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api, message } from "./api-client";
 
 import { views, type View } from "./auth-views";
 
 export default function AuthForm({ view }: { view: View }) {
-  const router = useRouter();
   const linkRead = useRef(false);
   const [secret, setSecret] = useState("");
   const [feedback, setFeedback] = useState<{ text: string; error: boolean }>();
@@ -42,11 +40,11 @@ export default function AuthForm({ view }: { view: View }) {
     try {
       const result = await api<{ message: string } | undefined>("/auth/" + spec.endpoint, "POST", data);
       if (login) {
-        router.replace("/perfil");
+        window.location.replace("/perfil");
         return;
       }
       if (view === "confirmar-email" || view === "confirmar-novo-email") {
-        router.replace(view === "confirmar-email" ? "/onboarding" : "/definicoes?email=confirmado");
+        window.location.replace(view === "confirmar-email" ? "/onboarding" : "/definicoes?email=confirmado");
         return;
       }
       const success = "Palavra-passe atualizada. Entre com os novos dados.";

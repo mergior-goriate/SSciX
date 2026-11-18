@@ -7,7 +7,7 @@ export default function Terms() {
         <h1>Termos de utilização</h1>
         <p className="muted">Versão local-v1 · Ambiente de desenvolvimento</p>
         <p>A SSciX guarda o email, as credenciais de acesso e os dados introduzidos no perfil. O email da conta permanece privado.</p>
-        <p>Ao ativar a visibilidade pública, autoriza a apresentação dos campos do perfil a qualquer pessoa com acesso ao endereço.</p>
+        <p>Ao ativar a visibilidade pública, autoriza a apresentação dos campos do perfil a membros da SSciX com sessão iniciada.</p>
         <p>Introduza apenas informações que pode partilhar. A afiliação, a função académica e o ORCID são declarados pelo titular.</p>
         <p>Pode tornar o perfil privado ou eliminar a conta na página Meu perfil.</p>
       </article>

@@ -80,7 +80,7 @@ export default function ProfileEditor() {
       </div>
       <button className="secondary" disabled={busy} onClick={() => void run(async () => {
         await api("/auth/logout", "POST");
-        router.replace("/entrar");
+        window.location.replace("/entrar");
       })}>Terminar sessão</button>
     </header>
     <div className="profile-grid">

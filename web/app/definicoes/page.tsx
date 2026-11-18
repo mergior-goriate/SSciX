@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
 
@@ -13,7 +12,6 @@ const settings = [
 ] as const;
 
 export default function Page() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<{ path: string; text: string; error?: boolean }>();
@@ -36,7 +34,7 @@ export default function Page() {
     try {
       const result = await api<{ message: string } | undefined>(path, method, data);
       form.reset();
-      if (method === "DELETE" || path === "/auth/deactivate") router.replace("/");
+      if (method === "DELETE" || path === "/auth/deactivate") window.location.replace("/");
       else setFeedback({ path, text: result?.message ?? "Palavra-passe actualizada." });
     } catch (failure) {
       setFeedback({ path, text: message(failure), error: true });

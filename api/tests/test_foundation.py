@@ -227,9 +227,10 @@ def test_social_workflow_permissions(account, app_config):
             profile_url = f"{root}/profiles/{author_slug}"
             author_profile["photo"] = png
             assert author.put(f"{root}/profiles/me", json=author_profile).status_code == 200
-            public = guest.get(profile_url).json()
+            assert guest.get(profile_url).status_code == 401
+            public = reader.get(profile_url).json()
             assert public["social_links"] == []
-            assert guest.get(public["photo"]).headers["content-type"] == "image/png"
+            assert reader.get(public["photo"]).headers["content-type"] == "image/png"
             suggestions = reader.get(f"{root}/profiles/discover/suggestions").json()
             suggestion = next(item for item in suggestions if item["slug"] == author_slug)
             assert suggestion["common_keywords"] == ["Educação"]
@@ -247,14 +248,18 @@ def test_social_workflow_permissions(account, app_config):
             assert publish.status_code == 201
             post = publish.json()
             post_url = f"{root}/feed/{post['id']}"
-            assert guest.get(post["image"]).headers["content-type"] == "image/png"
+            assert reader.get(post["image"]).headers["content-type"] == "image/png"
             assert reader.get(f"{root}/feed", params={"following": True}).json()[0]["id"] == post["id"]
             assert reader.put(post_url + "/actions/like").json()["likes"] == 1
             assert reader.put(post_url + "/actions/like").json()["likes"] == 1
             assert reader.put(post_url + "/actions/save").json()["saved"]
             assert reader.get(f"{root}/saved").json()[0]["id"] == post["id"]
             assert author.get(f"{root}/saved").json() == []
-            assert guest.get(f"{root}/saved").status_code == 401
+            for route in ("/session", "/feed", "/communities", "/profiles", "/profiles/discover/suggestions",
+                          "/saved", "/notifications", "/messages", post_url.removeprefix(root),
+                          post["image"].removeprefix(root), public["photo"].removeprefix(root)):
+                assert guest.get(f"{root}{route}").status_code == 401
+            assert reader.get(f"{root}/session").status_code == 204
             assert reader.get(f"{root}/notifications").json()[0]["topic_id"] == post["id"]
             assert reader.put(f"{root}/notifications/{post['id']}/read").status_code == 204
             assert reader.get(f"{root}/notifications").json()[0]["read"] is True
@@ -266,9 +271,9 @@ def test_social_workflow_permissions(account, app_config):
             assert guest.get(f"{root}/messages/{author_slug}").status_code == 401
 
             assert author.put(f"{root}/profiles/me", json={**author_profile, "is_public": False}).status_code == 200
-            assert guest.get(post_url).status_code == 404
-            assert guest.get(post["image"]).status_code == 404
-            assert guest.get(public["photo"]).status_code == 404
+            assert reader.get(post_url).status_code == 404
+            assert reader.get(post["image"]).status_code == 404
+            assert reader.get(public["photo"]).status_code == 404
             assert reader.get(f"{root}/saved").json() == []
             assert reader.get(f"{root}/notifications").json() == []
             assert reader.get(f"{root}/messages/{author_slug}").json()["messages"][0]["body"] == "Mensagem privada"

@@ -6,7 +6,7 @@ from sqlalchemy import case, cast, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.exc import IntegrityError
 
-from .auth import DB, get_user
+from .auth import DB, Member, get_user
 from .models import Follow, Profile, User
 from .schemas import KeywordsInput, MyProfile, ProfileData, Slug
 from .security import require_origin
@@ -91,22 +91,15 @@ class SuggestedProfile(DirectoryProfile):
 
 
 @router.get("/discover/suggestions", response_model=list[SuggestedProfile])
-def suggestions(db: DB, request: Request, similar_to: Slug | None = None):
-    user = None
-    try:
-        user = get_user(db, request)
-    except HTTPException as error:
-        if error.status_code != 401 or similar_to is None:
-            raise
+def suggestions(db: DB, user: Member, similar_to: Slug | None = None):
     reference = find_public_profile(db, similar_to) if similar_to else db.get(Profile, user.id)
     keywords = reference.keywords
     query = select(Profile).join(User).where(
         Profile.is_public.is_(True), User.deactivated_at.is_(None), Profile.user_id != reference.user_id,
     )
-    if user:
-        query = query.where(Profile.user_id != user.id, Profile.user_id.not_in(
-            select(Follow.followed_id).where(Follow.follower_id == user.id)
-        ))
+    query = query.where(Profile.user_id != user.id, Profile.user_id.not_in(
+        select(Follow.followed_id).where(Follow.follower_id == user.id)
+    ))
     if keywords:
         profile_keywords = cast(Profile.keywords, JSONB)
         overlap = sum(case((profile_keywords.has_key(word), 1), else_=0) for word in keywords)
