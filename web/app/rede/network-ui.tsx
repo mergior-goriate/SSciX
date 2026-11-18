@@ -146,15 +146,7 @@ export function ResearcherDiscovery({ similarTo }: { similarTo?: string }) {
   const path = "/profiles/discover/suggestions" + (similarTo ? `?similar_to=${similarTo}` : "");
   const { data, error } = useNetworkData<Person[]>(path);
 
-  return <aside className="feed-discovery" aria-label={similarTo ? "Perfis semelhantes" : "Descobrir investigadores"}>
-    {!similarTo && <section className="panel discovery-search-panel">
-      <h2>Encontrar pessoas</h2>
-      <form action="/pessoas" className="feed-search">
-        <label htmlFor="feed-search">Nome, instituição ou área</label>
-        <input id="feed-search" name="q" type="search" maxLength={100} />
-        <button className="secondary" type="submit">Pesquisar</button>
-      </form>
-    </section>}
+  return <div className="feed-discovery" role="region" aria-label={similarTo ? "Perfis semelhantes" : "Descobrir investigadores"}>
     <section className="panel">
       <h2>{similarTo ? "Perfis semelhantes" : "Pessoas para seguir"}</h2>
       {error ? <p className="muted">{error}</p> :
@@ -173,7 +165,7 @@ export function ResearcherDiscovery({ similarTo }: { similarTo?: string }) {
             ))}</ul>}
       <Link href="/pessoas">Ver directório de pessoas</Link>
     </section>
-  </aside>;
+  </div>;
 }
 
 type Actions = { liked: boolean; saved: boolean; likes: number };
@@ -257,6 +249,26 @@ export function SavedPosts() {
   const { data, error, refresh } = useNetworkData<Post[]>("/saved");
   return <div className="network-stack"><Posts data={data} error={error}
     empty="Ainda não guardou publicações." topic onChange={refresh} /></div>;
+}
+
+export function ProfilePosts({ slug }: { slug: string }) {
+  const { data, error } = useNetworkData<Post[]>(`/feed?author=${encodeURIComponent(slug)}`);
+  return <div className="network-stack">
+    <Posts data={data} error={error} empty="Este perfil ainda não tem publicações públicas." topic />
+  </div>;
+}
+
+export function CommunityHighlights() {
+  const { data, error } = useNetworkData<Community[]>("/communities");
+  return <section className="panel context-communities">
+    <h2>Comunidades</h2>
+    {error ? <p className="muted">{error}</p> : !data ? <p role="status">A carregar…</p> :
+      data.length ? <ul>{data.slice(0, 3).map((community) => <li key={community.id}>
+        <Link href={`/comunidades/${community.id}`}>{community.name}</Link>
+        <small>{community.description}</small>
+      </li>)}</ul> : <p className="muted">Ainda não há comunidades.</p>}
+    <Link href="/comunidades">Ver comunidades</Link>
+  </section>;
 }
 
 export function Feed({ communityId }: { communityId?: string }) {
