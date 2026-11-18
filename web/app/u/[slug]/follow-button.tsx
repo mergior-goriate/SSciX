@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, message } from "../../api-client";
 
-type FollowStatus = { following: boolean; can_follow: boolean };
+type Counts = { followers: number; following_count: number };
+type FollowStatus = Counts & { following: boolean; can_follow: boolean };
 
-export default function FollowButton({ slug }: { slug: string }) {
+export default function FollowButton({ slug, showCounts = false }: { slug: string; showCounts?: boolean }) {
   const path = `/profiles/${slug}/follow`;
   const [status, setStatus] = useState<FollowStatus>();
+  const [counts, setCounts] = useState<Counts>();
   const [guest, setGuest] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -19,11 +21,16 @@ export default function FollowButton({ slug }: { slug: string }) {
       if (active) setStatus(result);
     }).catch((failure) => {
       if (!active) return;
-      if (failure?.status === 401) setGuest(true);
+      if (failure?.status === 401) {
+        setGuest(true);
+        if (showCounts) api<Counts>(`/profiles/${slug}/counts`).then((result) => {
+          if (active) setCounts(result);
+        }).catch(() => {});
+      }
       else setError(message(failure));
     });
     return () => { active = false; };
-  }, [path]);
+  }, [path, showCounts, slug]);
 
   async function toggle() {
     if (!status || busy) return;
@@ -42,10 +49,14 @@ export default function FollowButton({ slug }: { slug: string }) {
     }
   }
 
-  if (guest) return <Link className="secondary" href="/entrar">Entrar para seguir</Link>;
+  const totals = status ?? counts;
   return (
     <div>
-      {status?.can_follow && (
+      {showCounts && totals && <p className="follow-counts" aria-live="polite">
+        <span>{totals.followers} Seguidores</span><span>{totals.following_count} A seguir</span>
+      </p>}
+      {guest && <Link className="secondary" href="/entrar">Entrar para seguir</Link>}
+      {!guest && status?.can_follow && (
         <button className="secondary" type="button" onClick={toggle} disabled={busy}>
           {status.following ? "Deixar de seguir" : "Seguir"}
         </button>

@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -16,6 +16,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(16), server_default="user")
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     terms_version: Mapped[str] = mapped_column(String(24))
     terms_accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -40,6 +41,9 @@ class Profile(Base):
     experience: Mapped[str] = mapped_column(Text, server_default="")
     publications: Mapped[str] = mapped_column(Text, server_default="")
     orcid: Mapped[str] = mapped_column(String(19), default="")
+    photo: Mapped[str] = mapped_column(Text, server_default="")
+    keywords: Mapped[list[str]] = mapped_column(JSON, server_default="[]")
+    social_links: Mapped[list[dict]] = mapped_column(JSON, server_default="[]")
     is_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
 
@@ -53,10 +57,11 @@ class Session(Base):
 
 class EmailToken(Base):
     __tablename__ = "email_tokens"
-    __table_args__ = (CheckConstraint("purpose IN ('verify', 'reset')", name="valid_token_purpose"),)
+    __table_args__ = (CheckConstraint("purpose IN ('verify', 'reset', 'change-email')", name="valid_token_purpose"),)
 
     digest: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    pending_email: Mapped[str | None] = mapped_column(String(254))
     purpose: Mapped[str] = mapped_column(String(12))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
@@ -94,6 +99,40 @@ class Discussion(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     author_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"), index=True)
     community_id: Mapped[UUID | None] = mapped_column(ForeignKey("communities.id", ondelete="CASCADE"), index=True)
+    image: Mapped[str] = mapped_column(Text, server_default="")
+    article_url: Mapped[str] = mapped_column(String(1000), server_default="")
     parent_id: Mapped[UUID | None] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"), index=True)
     body: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class Reaction(Base):
+    __tablename__ = "reactions"
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    post_id: Mapped[UUID] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+
+class Bookmark(Base):
+    __tablename__ = "bookmarks"
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    post_id: Mapped[UUID] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"), primary_key=True)
+
+
+class Mention(Base):
+    __tablename__ = "mentions"
+
+    recipient_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    post_id: Mapped[UUID] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"), primary_key=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DirectMessage(Base):
+    __tablename__ = "direct_messages"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    sender_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    recipient_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -9,9 +9,9 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
   const newPassword = "Outra palavra-passe de ensaio";
   const mailBase = process.env.SSCIX_MAIL_URL ?? "http://localhost:8025";
 
-  async function linkFromMail(route: string) {
+  async function linkFromMail(route: string, recipient = email) {
     const url = new URL("/view/latest.txt", mailBase);
-    url.searchParams.set("query", `to:${email}`);
+    url.searchParams.set("query", `to:${recipient}`);
     let link: string | undefined;
     await expect.poll(async () => {
       const response = await request.get(url.href);
@@ -36,6 +36,10 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
   await page.getByLabel("Palavra-passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Confirmar email" }).click();
   await expect(page.getByRole("status")).toContainText("Email confirmado");
+  await page.getByLabel("Pesquisar temas").fill("educacao");
+  await page.getByRole("checkbox", { name: "Educação" }).check();
+  await page.getByRole("button", { name: "Guardar e continuar" }).click();
+  await expect(page.getByRole("heading", { name: "Informação académica" })).toBeVisible();
 
   async function signIn(secret: string) {
     await page.goto("/entrar");
@@ -45,7 +49,6 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await expect(page.getByRole("heading", { name: "Informação académica" })).toBeVisible();
   }
 
-  await signIn(password);
   const visitor = await browser.newPage({ viewport: { width: 375, height: 800 } });
   try {
     const route = new URL(`/u/${slug}`, page.url()).href;
@@ -58,12 +61,45 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await expect(page.getByLabel("Instituição", { exact: true })).toHaveValue("Universidade de ensaio");
     await visitor.goto(route);
     await expect(visitor.getByRole("heading", { name: "Ana Mateus" })).toBeVisible();
-    await expect(visitor.getByText("Universidade de ensaio")).toBeVisible();
+    await expect(visitor.getByText("Universidade de ensaio", { exact: true })).toBeVisible();
     await expect(visitor.getByText(email)).toHaveCount(0);
+    expect(await visitor.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    const peerSlug = `celia-${id}`;
+    const peerEmail = `${peerSlug}@example.com`;
+    const origin = new URL(page.url()).origin;
+    const headers = { Origin: origin };
+    const peer = visitor.request;
+    const peerRegistration = await peer.post(origin + "/api/v1/auth/register", {
+      headers, data: { name: "Célia Chissano", slug: peerSlug, email: peerEmail, password, accept_terms: true },
+    });
+    expect(peerRegistration.status()).toBe(202);
+    const token = new URL(await linkFromMail("confirmar-email", peerEmail)).hash.slice("#token=".length);
+    expect((await peer.post(origin + "/api/v1/auth/verify", { headers, data: { token, password } })).status()).toBe(204);
+    const { email: _email, ...peerProfile } = await (await peer.get(origin + "/api/v1/profiles/me")).json();
+    expect((await peer.put(origin + "/api/v1/profiles/me", {
+      headers, data: { ...peerProfile, keywords: ["Educação"], is_public: true },
+    })).status()).toBe(200);
+    await page.goto("/rede");
+    await page.getByLabel("Criar publicação").fill("Primeira publicação académica.");
+    await page.getByRole("button", { name: "Publicar", exact: true }).click();
+    await expect(page.getByText("Primeira publicação académica.")).toBeVisible();
+    const recommendation = page.getByRole("listitem").filter({ hasText: "Célia Chissano" });
+    await recommendation.getByRole("button", { name: "Seguir", exact: true }).click();
+    await expect(recommendation.getByRole("button", { name: "Deixar de seguir" })).toBeVisible();
+    await recommendation.getByRole("link", { name: "Célia Chissano" }).click();
+    await expect(page.getByText("1 Seguidores")).toBeVisible();
+    await page.getByRole("link", { name: "Enviar mensagem" }).click();
+    await page.getByLabel("Escrever mensagem").fill("Olá, Célia. Vamos colaborar?");
+    await page.getByRole("button", { name: "Enviar mensagem" }).click();
+    await expect(page.getByText("Olá, Célia. Vamos colaborar?")).toBeVisible();
+    await visitor.goto(origin + "/mensagens");
+    await visitor.getByRole("link", { name: "Ana Mateus" }).click();
+    await expect(visitor.getByText("Olá, Célia. Vamos colaborar?")).toBeVisible();
+    await page.goto("/perfil");
     await page.getByRole("checkbox", { name: /Tornar o perfil público/ }).uncheck();
     await page.getByRole("button", { name: "Guardar perfil" }).click();
     await expect(page.getByRole("link", { name: /Ver perfil público/ })).toHaveCount(0);
-    expect((await visitor.reload())?.status()).toBe(404);
+    expect((await visitor.goto(route))?.status()).toBe(404);
 
     await page.getByRole("button", { name: "Terminar sessão" }).click();
     await expect(page).toHaveURL(/\/entrar$/);
@@ -77,8 +113,10 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await page.getByRole("button", { name: "Guardar palavra-passe" }).click();
     await expect(page.getByRole("status")).toContainText("Palavra-passe atualizada");
     await signIn(newPassword);
+    await page.goto("/definicoes");
     await page.getByText("Eliminar conta", { exact: true }).click();
     await page.getByLabel("Confirme a palavra-passe").fill(newPassword);
+    await page.getByLabel("Escreva ELIMINAR para confirmar").fill("ELIMINAR");
     await page.getByRole("button", { name: "Eliminar definitivamente" }).click();
     await expect(page).toHaveURL(/\/$/);
   } finally {

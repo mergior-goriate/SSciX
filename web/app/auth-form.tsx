@@ -14,10 +14,10 @@ export default function AuthForm({ view }: { view: View }) {
   const [feedback, setFeedback] = useState<{ text: string; error: boolean }>();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
-  const needsToken = view === "confirmar-email" || view === "nova-palavra-passe";
+  const needsToken = view === "confirmar-email" || view === "confirmar-novo-email" || view === "nova-palavra-passe";
   const registration = view === "registar";
   const login = view === "entrar";
-  const currentPassword = login || view === "confirmar-email";
+  const currentPassword = login || view === "confirmar-email" || view === "confirmar-novo-email";
   const asksPassword = registration || login || needsToken;
   const spec = views[view];
 
@@ -45,8 +45,11 @@ export default function AuthForm({ view }: { view: View }) {
         router.replace("/perfil");
         return;
       }
-      const success = view === "confirmar-email" ? "Email confirmado. Já pode entrar."
-        : "Palavra-passe atualizada. Entre com os novos dados.";
+      if (view === "confirmar-email" || view === "confirmar-novo-email") {
+        router.replace(view === "confirmar-email" ? "/onboarding" : "/definicoes?email=confirmado");
+        return;
+      }
+      const success = "Palavra-passe atualizada. Entre com os novos dados.";
       setFeedback({ text: result?.message ?? success, error: false });
       setDone(true);
     } catch (error) {
