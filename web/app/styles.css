@@ -207,7 +207,7 @@ dd { margin: 0; }
 
 /* Rede académica e acções de perfil. */
 .header-inner { gap: .75rem; }
-.header-inner .main-navigation { gap: .28rem; align-items: center; }
+.header-inner .main-navigation { column-gap: clamp(.75rem, 3vw, 2.75rem); row-gap: .28rem; align-items: center; }
 .main-navigation > a, .navigation-menu summary {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 44px; min-width: 44px; padding: .28rem .55rem; border-radius: 7px;
