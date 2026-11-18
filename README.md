@@ -2,6 +2,15 @@
 
 A SSciX é a rede académica do ecossistema Sussurros do Saber. A versão **0.1.0** inclui contas por email e um primeiro perfil académico persistente, com interface em português de Moçambique.
 
+## Publicar no Render
+
+1. Prepare um fornecedor de email transaccional com SMTP autenticado e STARTTLS na porta 587. Verifique o domínio ou endereço remetente junto do fornecedor.
+2. No [painel do Render](https://dashboard.render.com/), escolha **New → Blueprint** e seleccione o repositório SSciX, a branch `main` e o ficheiro `render.yaml`. Reveja os custos dos dois serviços Starter e da base de dados Basic antes de aplicar.
+3. Preencha `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` e `SMTP_FROM` no Render. Em `APP_ORIGIN`, indique a origem HTTPS pública do frontend, sem caminho. Se ainda não souber o endereço definitivo, introduza o endereço previsto e corrija-o no serviço `sscix-api` assim que o Render atribuir o endereço a `sscix-web`.
+4. Quando os serviços estiverem activos, abra `/api/v1/health` no endereço público. A resposta esperada é `{"status":"ok"}`. Crie uma conta de ensaio, confirme o email, entre e guarde um perfil. Reabra o perfil para confirmar que os dados foram guardados.
+
+O Blueprint liga o frontend à API e a API ao PostgreSQL pela rede privada. A API aplica as migrações no arranque.
+
 ## Executar localmente
 
 Com Docker e o plugin Docker Compose, execute na pasta que contém `compose.yaml`:
