@@ -32,7 +32,7 @@ h1 { font-size: clamp(2rem, 5vw, 3rem); margin-bottom: .42em; }
 h2 { font-size: 1.45rem; margin-bottom: .8em; }
 .site-width { width: min(1160px, calc(100% - 48px)); margin-inline: auto; }
 .site-header { background: var(--brand-deep); border-bottom: 3px solid var(--blue-mid); }
-.site-header .wordmark, .site-header .header-inner nav a { color: white; }
+.site-header .wordmark, .site-header .main-navigation > a { color: white; }
 .site-header .accent { color: var(--brand-light); }
 .site-header .mark { background: var(--brand); }
 .site-header :focus-visible { outline-color: var(--brand-light); }
