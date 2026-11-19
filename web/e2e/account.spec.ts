@@ -27,7 +27,12 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
   await page.getByLabel("Nome completo").fill("Ana Mateus");
   await page.getByLabel("Endereço público").fill(slug);
   await page.getByLabel("Email", { exact: true }).fill(email);
-  await page.getByLabel("Palavra-passe", { exact: false }).fill(password);
+  const registrationPassword = page.getByLabel("Palavra-passe", { exact: true });
+  await registrationPassword.fill(password);
+  await page.getByRole("button", { name: "Mostrar palavra-passe" }).click();
+  await expect(registrationPassword).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "Ocultar palavra-passe" }).click();
+  await expect(registrationPassword).toHaveAttribute("type", "password");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Criar conta" }).click();
   await expect(page.getByRole("status")).toContainText("Consulte a sua caixa de email");

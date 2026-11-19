@@ -12,22 +12,23 @@ export async function generateMetadata({ params }: { params: Promise<{ action: s
 export default async function AccountAction({ params }: { params: Promise<{ action: string }> }) {
   const { action } = await params;
   if (!Object.hasOwn(views, action)) notFound();
-  if (action === "entrar") {
-    return <main className="sign-in-shell">
-      <section className="sign-in-brand" aria-label="Sobre a SSciX">
+  if (action === "entrar" || action === "registar") {
+    const registration = action === "registar";
+    return <main className={`account-split${registration ? " registration-split" : ""}`}>
+      <section className="account-brand" aria-label="Sobre a SSciX">
         <span className="wordmark">
           <span className="mark" aria-hidden="true"><i /><i /><i /></span>
           <span>SSci<span className="accent">X</span></span>
         </span>
-        <div className="sign-in-intro">
+        <div className="account-intro">
           <p>Rede académica do Sussurros do Saber</p>
-          <h2>A investigação começa com uma conversa.</h2>
-          <p>Encontre investigadores, partilhe o seu trabalho e participe em debates académicos.</p>
+          <h2>{registration ? "Partilhe o seu trabalho com a comunidade académica." : "A investigação começa com uma conversa."}</h2>
+          {!registration && <p>Encontre investigadores, partilhe o seu trabalho e participe em debates académicos.</p>}
         </div>
         <AcademicAtlas />
       </section>
-      <div className="sign-in-form">
-        <AuthForm view="entrar" />
+      <div className="account-form">
+        <AuthForm key={action} view={action} />
       </div>
     </main>;
   }
