@@ -1,12 +1,10 @@
-import { Bookmark, House, MessageSquare, Search, Settings, UserRound, Users } from "lucide-react";
+import { Bookmark, House, Settings, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 
 const shortcuts = [
   ["/rede", "Feed académico", House],
   ["/perfil", "Meu perfil", UserRound],
-  ["/pessoas", "Encontrar pessoas", Search],
   ["/comunidades", "Comunidades", Users],
-  ["/mensagens", "Mensagens", MessageSquare],
   ["/guardados", "Guardados", Bookmark],
   ["/definicoes", "Definições", Settings],
 ] as const;
