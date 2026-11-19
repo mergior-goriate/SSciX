@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
-import { ArrowLeft, ArrowRight, MessageSquare, BookOpen, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, BookOpen, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
 import Avatar from "../avatar";
 import { readImage } from "../media";
 import FollowButton from "../u/[slug]/follow-button";
@@ -220,7 +220,7 @@ function PostActions({ post, onChange }: { post: Post; onChange?: () => void }) 
       <Link href={`/rede/${post.id}#comentarios`}><MessageCircle size={18} aria-hidden="true" /> Comentar</Link>
       <button type="button" onClick={() => void share()}><Forward size={18} aria-hidden="true" /> Partilhar</button>
       <button type="button" aria-pressed={actions.saved} disabled={busy} onClick={() => void toggle("save", actions.saved)}>
-        <Bookmark size={18} aria-hidden="true" /> {actions.saved ? "Guardado" : "Guardar"}
+        <Bookmark size={18} aria-hidden="true" /> {actions.saved ? (onChange ? "Remover dos guardados" : "Guardado") : "Guardar"}
       </button>
     </div>
     {shareUrl && <label>Ligação para partilhar<input value={shareUrl} readOnly onFocus={(event) => event.currentTarget.select()} /></label>}
@@ -256,10 +256,63 @@ function Posts({ data, error, empty, topic, onChange }: {
   return data.map((post) => <PostCard key={post.id} post={post} topic={topic} onChange={onChange} />);
 }
 
+const savedFilters = [
+  { id: "all", label: "Todas", icon: Bookmark },
+  { id: "articles", label: "Com artigo", icon: FileText },
+  { id: "images", label: "Com imagem", icon: ImageIcon },
+] as const;
+
 export function SavedPosts() {
   const { data, error, refresh } = useNetworkData<Post[]>("/saved");
-  return <div className="network-stack"><Posts data={data} error={error}
-    empty="Ainda não guardou publicações." topic onChange={refresh} /></div>;
+  const [filter, setFilter] = useState<(typeof savedFilters)[number]["id"]>("all");
+  const visible = data?.filter((post) => filter === "all" || (filter === "articles" ? post.article_url : post.image));
+
+  return <>
+    <header className="information-hero">
+      <div>
+        <h1>Publicações guardadas</h1>
+        <p className="saved-privacy"><LockKeyhole size={16} aria-hidden="true" /> Visíveis apenas para si</p>
+      </div>
+      <span className="information-hero-icon"><Bookmark size={32} aria-hidden="true" /></span>
+    </header>
+    <div className="saved-layout">
+      <div className="panel settings-categories saved-filters" role="group" aria-label="Filtrar publicações guardadas">
+        {savedFilters.map(({ id, label, icon: Icon }) =>
+          <button key={id} type="button" aria-pressed={id === filter} onClick={() => setFilter(id)}>
+            <Icon size={18} aria-hidden="true" />{label}
+          </button>)}
+      </div>
+      <section className="network-stack" aria-label="Resultados dos guardados">
+        {error ? <p className="notice error" role="alert">{error}</p> :
+          !visible ? <p role="status">A carregar…</p> :
+            !visible.length ? <div className="panel saved-empty">
+              <Bookmark size={28} aria-hidden="true" />
+              <p role="status">{data?.length ? "Nenhuma publicação neste filtro." : "Ainda não guardou publicações."}</p>
+              {data?.length ? <button type="button" className="secondary" onClick={() => setFilter("all")}>Ver todas</button> :
+                <Link href="/rede" className="secondary">Explorar o feed</Link>}
+            </div> :
+              visible.map((post) => <article className="panel saved-card" key={post.id}>
+                <div className="saved-card-main">
+                  <Link className="saved-preview" href={`/rede/${post.id}`} aria-label="Abrir publicação">
+                    {post.image ? <img src={post.image} alt="" loading="lazy" /> : <FileText size={25} aria-hidden="true" />}
+                  </Link>
+                  <div className="saved-card-copy">
+                    <div className="feed-author">
+                      <Avatar name={post.author_name} photo={post.author_photo} />
+                      <Link href={`/u/${post.author_slug}`}><strong>{post.author_name}</strong></Link>
+                      <time className="muted" dateTime={post.created_at}>{post.created_at.slice(0, 10)}</time>
+                    </div>
+                    <p className="biography">{post.body}</p>
+                    {post.article_url && <a className="icon-action" href={post.article_url} target="_blank" rel="noopener noreferrer">
+                      <LinkIcon size={16} aria-hidden="true" /> Abrir artigo
+                    </a>}
+                  </div>
+                </div>
+                <PostActions post={post} onChange={refresh} />
+              </article>)}
+      </section>
+    </div>
+  </>;
 }
 
 export function ProfilePosts({ slug }: { slug: string }) {

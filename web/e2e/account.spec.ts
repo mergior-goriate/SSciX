@@ -137,6 +137,17 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     expect(await Promise.all(fixedElements.map((selector) => page.locator(selector).boundingBox()))).toEqual(positions);
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
     await page.setViewportSize(desktopViewport);
+    const firstPost = page.getByRole("article").filter({ hasText: "Primeira publicação académica." });
+    await firstPost.getByRole("button", { name: "Guardar", exact: true }).click();
+    await expect(firstPost.getByRole("button", { name: "Guardado", exact: true })).toBeVisible();
+    await page.goto("/guardados");
+    await expect(page.getByText("Primeira publicação académica.")).toBeVisible();
+    await page.getByRole("button", { name: "Com imagem" }).click();
+    await expect(page.getByText("Nenhuma publicação neste filtro.")).toBeVisible();
+    await page.getByRole("button", { name: "Ver todas" }).click();
+    await page.getByRole("button", { name: "Remover dos guardados" }).click();
+    await expect(page.getByText("Ainda não guardou publicações.")).toBeVisible();
+    await page.getByRole("link", { name: "Explorar o feed" }).click();
     const recommendation = page.getByRole("listitem").filter({ hasText: "Célia Chissano" });
     await recommendation.getByRole("button", { name: "Seguir", exact: true }).click();
     await expect(recommendation.getByRole("button", { name: "Deixar de seguir" })).toBeVisible();
