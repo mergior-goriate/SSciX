@@ -665,3 +665,29 @@ body:has(.account-split) .site-footer { margin-top: 0; }
   .information-layout { grid-template-columns: minmax(0, 1fr); }
   .information-index { position: static; display: flex; flex-wrap: wrap; }
 }
+
+.community-hero { flex-wrap: wrap; }
+.community-directory { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .38fr); gap: 1rem; align-items: start; margin-top: 1rem; }
+.community-results, .community-guide, .community-dialog { padding: clamp(16px, 3vw, 26px); }
+.community-search { position: relative; display: block; margin-bottom: .85rem; }
+.community-search svg { position: absolute; top: 50%; inset-inline-start: .75rem; transform: translateY(-50%); color: var(--brand); }
+.community-search input { padding-inline-start: 2.35rem; background: var(--background); }
+.community-list { list-style: none; padding: 0; margin: 0; }
+.community-list li + li { border-top: 1px solid var(--line); }
+.community-list a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; align-items: center; padding: .75rem .4rem; text-decoration: none; }
+.community-list a:hover { background: var(--brand-wash); }
+.community-list small { display: block; margin-top: .2rem; overflow-wrap: anywhere; }
+.community-list strong { overflow-wrap: anywhere; }
+.community-list-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: var(--brand-wash); }
+.community-guide h2 { display: flex; gap: .5rem; align-items: center; font-size: 1.1rem; }
+.community-guide svg { flex-shrink: 0; color: var(--brand); }
+.community-dialog { width: min(470px, calc(100% - 28px)); color: var(--ink); }
+.community-dialog::backdrop { background: #001d3966; }
+.community-dialog header { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.community-dialog header h2 { margin: 0; }
+.community-dialog header button { padding: .45rem; min-width: 44px; }
+.community-dialog .form-stack { margin-top: .8rem; }
+
+@media (max-width: 720px) {
+  .community-directory { grid-template-columns: minmax(0, 1fr); }
+}

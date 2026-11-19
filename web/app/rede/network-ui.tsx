@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
-import { Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
+import { ArrowRight, BookOpen, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
 import Avatar from "../avatar";
 import { readImage } from "../media";
 import FollowButton from "../u/[slug]/follow-button";
@@ -309,17 +309,25 @@ export function Topic({ id }: { id: string }) {
 
 export function CommunityDirectory() {
   const { data, error, refresh } = useNetworkData<Community[]>("/communities");
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
+  const normalise = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const query = normalise(search.trim());
+  const visible = data?.filter(({ name, description }) => normalise(`${name} ${description}`).includes(query));
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     const form = event.currentTarget;
     setBusy(true);
     setFailure("");
     try {
       await api("/communities", "POST", Object.fromEntries(new FormData(form)));
       form.reset();
+      dialog.current?.close();
+      setSearch("");
       refresh();
     } catch (err) {
       setFailure(message(err));
@@ -328,21 +336,52 @@ export function CommunityDirectory() {
     }
   }
 
-  return <div className="network-stack">
-    <form className="panel form-stack" onSubmit={create}>
-      <h2>Criar comunidade</h2>
-      <label>Nome<input name="name" minLength={2} maxLength={120} required /></label>
-      <label>Âmbito da comunidade<textarea name="description" rows={3} maxLength={600} required /></label>
-      <button className="primary" disabled={busy}>Criar comunidade</button>
-      {failure && <p className="notice error" role="alert">{failure}</p>}
-    </form>
-    {error ? <p role="alert">{error}</p> : !data ? <p role="status">A carregar…</p> :
-      data.length === 0 ? <p className="muted">Ainda não há comunidades.</p> :
-        data.map((community) => <article className="panel" key={community.id}>
-          <h2><Link href={`/comunidades/${community.id}`}>{community.name}</Link></h2>
-          <p className="biography">{community.description}</p>
-        </article>)}
-  </div>;
+  return <>
+    <header className="information-hero community-hero">
+      <h1>Comunidades</h1>
+      <button className="secondary" type="button" onClick={() => dialog.current?.showModal()}>
+        <Plus size={19} aria-hidden="true" /> Criar comunidade
+      </button>
+    </header>
+    <div className="community-directory">
+      <section className="panel community-results">
+        <h2>Explorar comunidades</h2>
+        <label className="community-search">
+          <Search size={18} aria-hidden="true" />
+          <input type="search" aria-label="Pesquisar comunidades" placeholder="Pesquisar por nome ou tema"
+            value={search} onChange={(event) => setSearch(event.target.value)} />
+        </label>
+        {error ? <p role="alert">{error}</p> : !visible ? <p role="status">A carregar…</p> :
+          !visible.length ? <p className="muted" role="status">{query ? "Nenhuma comunidade encontrada." : "Ainda não há comunidades."}</p> :
+            <ul className="community-list">{visible.map((community) => <li key={community.id}>
+              <Link href={`/comunidades/${community.id}`}>
+                <span className="community-list-icon"><Users size={22} aria-hidden="true" /></span>
+                <span><strong>{community.name}</strong><small>{community.description}</small></span>
+                <ArrowRight size={18} aria-hidden="true" />
+              </Link>
+            </li>)}</ul>}
+      </section>
+      <aside className="panel community-guide">
+        <h2><BookOpen size={20} aria-hidden="true" /> Participar nos debates</h2>
+        <p className="muted">Consulte as orientações antes de publicar ou comentar numa comunidade.</p>
+        <Link href="/ajuda#comunidades">Políticas das comunidades</Link>
+      </aside>
+    </div>
+    <dialog className="panel community-dialog" ref={dialog} aria-labelledby="create-community-title"
+      onCancel={(event) => { if (busy) event.preventDefault(); }}>
+      <header>
+        <h2 id="create-community-title">Criar comunidade</h2>
+        <button className="secondary" type="button" aria-label="Fechar formulário" disabled={busy}
+          onClick={() => dialog.current?.close()}><X size={18} aria-hidden="true" /></button>
+      </header>
+      <form className="form-stack" onSubmit={create}>
+        <label>Nome<input name="name" minLength={2} maxLength={120} required /></label>
+        <label>Âmbito da comunidade<textarea name="description" rows={3} maxLength={600} required /></label>
+        <button className="primary" disabled={busy}>Criar comunidade</button>
+        {failure && <p className="notice error" role="alert">{failure}</p>}
+      </form>
+    </dialog>
+  </>;
 }
 
 export function CommunityPage({ id }: { id: string }) {
