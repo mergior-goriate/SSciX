@@ -1,5 +1,6 @@
 import { Bookmark, House, Settings, UserRound, Users } from "lucide-react";
 import Link from "next/link";
+import FeedProfileCard from "./feed-profile-card";
 
 const shortcuts = [
   ["/rede", "Feed académico", House],
@@ -11,10 +12,10 @@ const shortcuts = [
 
 export default function NetworkSideNav({ active }: { active?: string }) {
   return <aside className="network-rail">
-    <Link href="/perfil" className="panel rail-profile">
+    {active === "/rede" ? <FeedProfileCard /> : <Link href="/perfil" className="panel rail-profile">
       <span className="feed-initials"><UserRound size={18} aria-hidden="true" /></span>
       <strong>Meu perfil</strong>
-    </Link>
+    </Link>}
     <nav className="feed-navigation" aria-label="Atalhos da rede">
       {shortcuts.filter(([href]) => href !== "/perfil").map(([href, label, Icon]) =>
         <Link key={href} href={href} aria-current={active === href ? "page" : undefined}>
