@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
 import { ArrowLeft, ArrowRight, MessageSquare, BookOpen, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
 import Avatar from "../avatar";
@@ -140,34 +140,41 @@ function Composer({ endpoint, label, communityId, onSaved }: {
   </form>;
 }
 
-type Person = { slug: string; name: string; institution: string; specialization: string; photo: string; common_keywords: string[] };
+type Person = { slug: string; name: string; photo: string };
 
 export function ResearcherDiscovery({ similarTo }: { similarTo?: string }) {
   const path = "/profiles/discover/suggestions" + (similarTo ? `?similar_to=${similarTo}` : "");
   const { data, error } = useNetworkData<Person[]>(path);
 
+  const [expanded, setExpanded] = useState(false);
+  const listId = useId();
+  const visible = expanded ? data : data?.slice(0, 3);
+
   return <div className="feed-discovery" role="region" aria-label={similarTo ? "Perfis semelhantes" : "Descobrir investigadores"}>
     <section className="panel">
       <h2>{similarTo ? "Perfis semelhantes" : "Investigadores para seguir"}</h2>
-      {error ? <p className="muted">{error}</p> :
-        !data ? <p className="muted" role="status">A carregar perfis…</p> :
-          !data.length ? <p className="muted">Ainda não há sugestões.</p> :
-            <ul className="feed-researchers">{data.map((person) => (
+      {error ? <p className="muted" role="alert">{error}</p> :
+        !visible ? <p className="muted" role="status">A carregar perfis…</p> :
+          !visible.length ? <p className="muted">Ainda não há sugestões.</p> :
+            <ul className="feed-researchers" id={listId}>{visible.map((person) => (
               <li key={person.slug}>
-                <div className="researcher-identity">
+                <Link className="researcher-identity" href={`/u/${person.slug}`}>
                   <Avatar name={person.name} photo={person.photo} />
-                  <div>
-                    <Link href={`/u/${person.slug}`}>{person.name}</Link>
-                    {(person.institution || person.specialization) && <small>{person.institution || person.specialization}</small>}
-                  </div>
-                </div>
-                {person.common_keywords.length > 0 && <small className="researcher-topics">
-                  Em comum: {person.common_keywords.join(", ")}
-                </small>}
-                <FollowButton slug={person.slug} showCounts />
+                  <span className="researcher-name">
+                    <strong title={person.name}>{person.name}</strong>
+                    <small title={`@${person.slug}`}>@{person.slug}</small>
+                  </span>
+                </Link>
+                <FollowButton slug={person.slug} />
               </li>
             ))}</ul>}
-      <Link href="/pessoas">Ver directório de pessoas</Link>
+      <div className="researcher-links">
+        {data && data.length > 3 && <button className="researcher-more" type="button"
+          aria-controls={listId} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+          {expanded ? "Mostrar menos" : "Mostrar mais"}
+        </button>}
+        {(!data || data.length <= 3 || expanded) && <Link href="/pessoas">Ver directório de pessoas</Link>}
+      </div>
     </section>
   </div>;
 }
