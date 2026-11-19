@@ -1,5 +1,6 @@
 "use client";
 
+import { BookOpen, ExternalLink, Eye, LogOut, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
@@ -74,20 +75,37 @@ export default function ProfileEditor() {
   if (!profile) return <p role="status">A carregar o perfil…</p>;
 
   return <>
-    <header className="profile-heading">
-      <div><h1>Meu perfil</h1><p className="muted">{profile.email}</p>
-        {counts && <p className="follow-counts"><span>{counts.followers} Seguidores</span><span>{counts.following_count} A seguir</span></p>}
+    <header className="panel own-profile-header">
+      <div className="own-profile-cover" aria-hidden="true" />
+      <div className="own-profile-identity">
+        <PhotoEditor name={profile.name} photo={photo} change={(file) => void changePhoto(file)} />
+        <div className="own-profile-details">
+          <h1>Meu perfil</h1>
+          <strong>{profile.name}</strong>
+          <p className="muted">{profile.institution || profile.email}</p>
+          {counts && <p className="follow-counts"><span>{counts.followers} Seguidores</span><span>{counts.following_count} A seguir</span></p>}
+        </div>
+        <div className="own-profile-actions">
+          {profile.is_public && <Link className="secondary icon-action" href={`/u/${profile.slug}`}>
+            <ExternalLink size={17} aria-hidden="true" /> Ver perfil público
+          </Link>}
+          <button className="secondary icon-action" disabled={busy} onClick={() => void run(async () => {
+            await api("/auth/logout", "POST");
+            window.location.replace("/entrar");
+          })}><LogOut size={17} aria-hidden="true" /> Terminar sessão</button>
+        </div>
       </div>
-      <button className="secondary" disabled={busy} onClick={() => void run(async () => {
-        await api("/auth/logout", "POST");
-        window.location.replace("/entrar");
-      })}>Terminar sessão</button>
     </header>
-    <div className="profile-grid">
-      <section className="panel">
-        <h2>Informação académica</h2>
-        <form className="form-stack" onSubmit={save}>
-          <PhotoEditor name={profile.name} photo={photo} change={(file) => void changePhoto(file)} />
+    <div className="own-profile-grid">
+      <nav className="panel own-profile-nav" aria-label="Secções do perfil">
+        <a href="#informacao-academica"><UserRound size={18} aria-hidden="true" /> Informação académica</a>
+        <a href="#trajectoria"><BookOpen size={18} aria-hidden="true" /> Trajectória e ligações</a>
+        <a href="#visibilidade"><Eye size={18} aria-hidden="true" /> Visibilidade</a>
+        <Link href="/definicoes"><Settings size={18} aria-hidden="true" /> Definições da conta</Link>
+      </nav>
+      <form className="own-profile-form" onSubmit={save}>
+        <section className="panel" id="informacao-academica">
+          <h2>Informação académica</h2>
           <div className="field-grid">
             <label>Nome completo<input name="name" required minLength={2} maxLength={120} defaultValue={profile.name} /></label>
             <label>Endereço público<input name="slug" required minLength={3} maxLength={40} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" defaultValue={profile.slug} /></label>
@@ -101,22 +119,25 @@ export default function ProfileEditor() {
           </div>
           <label>Sobre mim<textarea name="biography" rows={5} maxLength={2000} defaultValue={profile.biography} /></label>
           <KeywordPicker value={keywords} setValue={setKeywords} />
-          <SocialEditor links={links} change={setLinks} />
+        </section>
+        <section className="panel" id="trajectoria">
+          <h2>Trajectória e ligações</h2>
           {trajectory.map(([field, label]) => (
             <label key={field}>{label}<textarea name={field} rows={3} maxLength={2000} defaultValue={profile[field]} /></label>
           ))}
+          <SocialEditor links={links} change={setLinks} />
+        </section>
+        <section className="panel" id="visibilidade">
+          <h2>Visibilidade</h2>
           <label className="check"><input type="checkbox" name="is_public" defaultChecked={profile.is_public} />
             <span>Tornar o perfil público. O perfil e as suas publicações ficam visíveis na rede académica.</span>
           </label>
-          <div className="profile-actions"><button className="primary" disabled={busy}>Guardar perfil</button>
-            {profile.is_public && <Link href={`/u/${profile.slug}`}>Ver perfil público ↗</Link>}</div>
+        </section>
+        <div className="panel own-profile-save">
           {status && <p className={status.error ? "notice error" : "notice"} role={status.error ? "alert" : "status"}>{status.text}</p>}
-        </form>
-      </section>
-      <aside className="panel account-panel">
-        <h2>Conta</h2>
-        <Link href="/definicoes">Abrir definições da conta</Link>
-      </aside>
+          <button className="primary" disabled={busy}>Guardar perfil</button>
+        </div>
+      </form>
     </div>
   </>;
 }

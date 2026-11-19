@@ -591,3 +591,42 @@ body:has(.account-split) .site-footer { margin-top: 0; }
   .settings-categories { display: flex; flex-wrap: wrap; }
   .settings-categories button { flex: 1 1 auto; }
 }
+
+.own-profile-shell { max-width: 1080px; padding-top: clamp(16px, 3vw, 32px); }
+.own-profile-header { padding: 0; overflow: hidden; }
+.own-profile-cover {
+  height: clamp(74px, 12vw, 132px);
+  background: radial-gradient(ellipse at top right, var(--brand-light), transparent 65%),
+    linear-gradient(115deg, var(--brand-deep), var(--brand));
+}
+.own-profile-identity { display: flex; align-items: flex-start; gap: 1rem; padding: 1rem clamp(16px, 3vw, 26px); }
+.own-profile-identity .profile-photo-editor { flex: 0 0 auto; flex-direction: column; align-items: flex-start; margin-top: -2.65rem; }
+.own-profile-identity .initials { flex-basis: auto; border: 3px solid var(--paper); width: 76px; height: 76px; }
+.own-profile-identity .profile-photo-editor > div { display: grid; gap: .35rem; }
+.own-profile-identity .profile-photo-editor .secondary { min-height: 34px; font-size: .8rem; padding: .35rem .6rem; }
+.own-photo-upload { position: relative; cursor: pointer; }
+.own-photo-upload:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.own-photo-upload input { position: absolute; inset: 0; height: 100%; min-height: 0; opacity: 0; cursor: pointer; }
+.own-profile-details { min-width: 0; overflow-wrap: anywhere; }
+.own-profile-details h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin-bottom: .2rem; }
+.own-profile-details p { margin: .25rem 0 0; }
+.own-profile-details .follow-counts { flex-wrap: wrap; gap: .2rem .9rem; }
+.own-profile-actions { margin-inline-start: auto; display: flex; gap: .45rem; flex-wrap: wrap; }
+.own-profile-actions .secondary { min-height: 38px; font-size: .85rem; }
+.own-profile-grid { display: grid; grid-template-columns: minmax(200px, .35fr) minmax(0, 1fr); gap: .9rem; margin-top: .9rem; align-items: start; }
+.own-profile-nav { padding: .6rem; display: grid; gap: .25rem; }
+.own-profile-nav a { display: flex; align-items: center; gap: .55rem; padding: .65rem; border-radius: 7px; font-weight: 650; text-decoration: none; }
+.own-profile-nav a:hover { background: var(--brand-wash); }
+.own-profile-form { display: grid; gap: .85rem; min-width: 0; }
+.own-profile-form > section { display: grid; gap: .85rem; padding: clamp(16px, 3vw, 26px); }
+.own-profile-form h2 { margin: 0; }
+.own-profile-form .social-editor { margin-top: 0; }
+.own-profile-save { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .55rem; padding: .75rem; position: sticky; bottom: 0; z-index: 1; }
+.own-profile-save .notice { margin: 0; }
+
+@media (max-width: 740px) {
+  .own-profile-grid { grid-template-columns: minmax(0, 1fr); }
+  .own-profile-nav { display: flex; flex-wrap: wrap; }
+  .own-profile-identity { flex-wrap: wrap; }
+  .own-profile-actions { margin-inline-start: 0; width: 100%; }
+}
