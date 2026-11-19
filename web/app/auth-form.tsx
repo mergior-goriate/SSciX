@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api, message } from "./api-client";
@@ -12,6 +13,7 @@ export default function AuthForm({ view }: { view: View }) {
   const [feedback, setFeedback] = useState<{ text: string; error: boolean }>();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [showRegistrationPassword, setShowRegistrationPassword] = useState(false);
   const needsToken = view === "confirmar-email" || view === "confirmar-novo-email" || view === "nova-palavra-passe";
   const registration = view === "registar";
   const login = view === "entrar";
@@ -67,7 +69,19 @@ export default function AuthForm({ view }: { view: View }) {
           <label>Endereço público<input name="slug" autoComplete="username" placeholder="ex. ana-mateus" required minLength={3} maxLength={40} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label>
         </>}
         {!needsToken && <label>Email<input type="email" name="email" autoComplete="email" required maxLength={254} placeholder="nome@instituicao.edu" /></label>}
-        {asksPassword && <label>Palavra-passe
+        {registration && <div className="registration-password">
+          <label htmlFor="registration-password">Palavra-passe</label>
+          <div className="registration-password-field">
+            <input id="registration-password" name="password" type={showRegistrationPassword ? "text" : "password"}
+              autoComplete="new-password" required minLength={12} maxLength={128} aria-describedby="registration-password-hint" />
+            <button type="button" aria-label={showRegistrationPassword ? "Ocultar palavra-passe" : "Mostrar palavra-passe"}
+              onClick={() => setShowRegistrationPassword((visible) => !visible)}>
+              {showRegistrationPassword ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
+            </button>
+          </div>
+          <small id="registration-password-hint">Mínimo de 12 caracteres.</small>
+        </div>}
+        {asksPassword && !registration && <label>Palavra-passe
           <input type="password" name="password" autoComplete={currentPassword ? "current-password" : "new-password"}
             required minLength={currentPassword ? 1 : 12} maxLength={128} />
           {!currentPassword && <small>Mínimo de 12 caracteres.</small>}
