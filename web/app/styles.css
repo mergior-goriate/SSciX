@@ -52,6 +52,8 @@ h2 { font-size: 1.45rem; margin-bottom: .8em; }
 .site-footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem 1rem; }
 .site-footer a { color: var(--muted); text-decoration: none; padding-block: .2rem; }
 .site-footer a:hover, .site-footer a:focus-visible { color: var(--brand); text-decoration: underline; }
+.footer-copyright { display: flex; flex-wrap: wrap; justify-content: center; gap: .25rem .65rem; margin: .65rem 0 0; color: var(--muted); }
+.footer-copyright strong { color: var(--brand); }
 .landing { padding-top: clamp(26px, 6vw, 68px); }
 .hero {
   min-height: 520px; display: grid; align-items: center; grid-template-columns: 1.25fr 1fr;

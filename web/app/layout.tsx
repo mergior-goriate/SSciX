@@ -38,6 +38,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link href="/ajuda#recomendacoes">Visibilidade das recomendações</Link>
             <Link href="/termos">Termos de utilização</Link>
           </nav>
+          <p className="footer-copyright"><strong>SSciX</strong> <span>Sussurros do Saber © 2026</span></p>
         </footer>
       </body>
     </html>
