@@ -494,3 +494,49 @@ body:has(.network-layout) .notification-trigger[aria-expanded="true"] { backgrou
   .message-thread-empty, .has-thread .message-inbox { display: none; }
   .thread-back { display: inline-grid; }
 }
+
+body:has(.sign-in-shell) .site-header { display: none; }
+body:has(.sign-in-shell) .site-footer { margin-top: 0; }
+.sign-in-shell {
+  width: min(1160px, calc(100% - 48px));
+  margin: clamp(24px, 5vw, 68px) auto;
+  display: grid;
+  grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+  min-height: 590px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--paper);
+}
+.sign-in-brand {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  justify-items: start;
+  overflow: hidden;
+  padding: clamp(28px, 4.8vw, 64px);
+  background: var(--brand-deep);
+  color: white;
+}
+.sign-in-brand .wordmark { color: white; font-size: 1.8rem; }
+.sign-in-brand .accent { color: var(--brand-light); }
+.sign-in-brand .mark { background: var(--brand); }
+.sign-in-intro { align-self: center; padding-bottom: 4rem; }
+.sign-in-intro h2 { font-size: clamp(2rem, 4vw, 3.6rem); margin-bottom: .45em; }
+.sign-in-intro p:first-child { color: var(--brand-light); font-weight: 650; font-size: .88rem; }
+.sign-in-intro p:last-child { margin: 0; max-width: 28ch; color: var(--blue-pale); }
+.sign-in-brand .atlas { z-index: -1; inset: auto -11% -15% auto; width: 92%; height: 70%; opacity: .78; }
+.sign-in-form { display: grid; align-items: center; padding: clamp(24px, 5vw, 68px); }
+.sign-in-form .auth-content { width: 100%; padding: 0; border: 0; border-radius: 0; }
+.sign-in-form h1 { font-size: clamp(1.65rem, 3vw, 2.6rem); }
+.sign-in-form .form-stack > button, .sign-in-form .sign-in-register { width: 100%; }
+.sign-in-form .auth-links { display: grid; justify-items: start; gap: .7rem; }
+.sign-in-form .sign-in-register { margin-top: .3rem; }
+
+@media (max-width: 740px) {
+  .sign-in-shell { width: min(520px, calc(100% - 28px)); grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .sign-in-brand { display: block; padding: 1rem 1.5rem; }
+  .sign-in-intro, .sign-in-brand .atlas { display: none; }
+  .sign-in-form { padding: 1.5rem; }
+}
