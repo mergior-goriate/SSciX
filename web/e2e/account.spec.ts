@@ -125,6 +125,18 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await page.getByLabel("Criar publicação").fill(`Primeira publicação académica. @${peerSlug}`);
     await page.getByRole("button", { name: "Publicar", exact: true }).click();
     await expect(page.getByText("Primeira publicação académica.")).toBeVisible();
+    const desktopViewport = page.viewportSize()!;
+    await page.setViewportSize({ width: 1280, height: 540 });
+    const fixedElements = [".site-header", ".network-rail", ".network-context", ".site-footer"];
+    const positions = await Promise.all(fixedElements.map((selector) => page.locator(selector).boundingBox()));
+    const feedScrollTop = await page.getByRole("region", { name: "Feed académico" }).evaluate((feed) => {
+      feed.scrollTop = feed.scrollHeight;
+      return feed.scrollTop;
+    });
+    expect(feedScrollTop).toBeGreaterThan(0);
+    expect(await Promise.all(fixedElements.map((selector) => page.locator(selector).boundingBox()))).toEqual(positions);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await page.setViewportSize(desktopViewport);
     const recommendation = page.getByRole("listitem").filter({ hasText: "Célia Chissano" });
     await recommendation.getByRole("button", { name: "Seguir", exact: true }).click();
     await expect(recommendation.getByRole("button", { name: "Deixar de seguir" })).toBeVisible();
