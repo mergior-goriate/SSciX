@@ -630,3 +630,38 @@ body:has(.account-split) .site-footer { margin-top: 0; }
   .own-profile-identity { flex-wrap: wrap; }
   .own-profile-actions { margin-inline-start: 0; width: 100%; }
 }
+
+.information-shell { max-width: 1080px; padding-top: clamp(16px, 3vw, 36px); min-height: 440px; }
+.information-hero {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: clamp(18px, 4vw, 42px); border-radius: 16px; color: white;
+  background: linear-gradient(112deg, var(--brand-deep), var(--brand));
+}
+.information-hero h1 { margin: 0; font-size: clamp(1.75rem, 4.6vw, 3rem); }
+.information-hero p { margin: .6rem 0 0; color: var(--blue-pale); }
+.information-hero-icon {
+  display: grid; place-items: center; flex: 0 0 auto; width: clamp(45px, 8vw, 72px); aspect-ratio: 1;
+  background: #ffffff18; color: var(--brand-light); border-radius: 14px;
+}
+.information-layout { display: grid; grid-template-columns: minmax(210px, .43fr) minmax(0, 1fr); gap: 1rem; margin-top: 1rem; align-items: start; }
+.information-index { position: sticky; top: 1rem; display: grid; gap: .2rem; padding: .55rem; }
+.information-index a { display: flex; align-items: center; gap: .55rem; min-height: 44px; padding: .55rem .65rem; border-radius: 7px; font-size: .9rem; font-weight: 650; text-decoration: none; }
+.information-index a:hover { background: var(--brand-wash); }
+.information-index svg { flex-shrink: 0; }
+.information-content { display: grid; gap: .85rem; min-width: 0; }
+.information-card { padding: clamp(16px, 3vw, 29px); scroll-margin-top: 1rem; }
+.information-card:target { border-color: var(--blue-mid); }
+.information-card h2 { display: flex; align-items: center; gap: .65rem; font-size: clamp(1.15rem, 3vw, 1.45rem); }
+.information-card h2 span { display: grid; place-items: center; flex: 0 0 38px; aspect-ratio: 1; border-radius: 9px; color: var(--brand); background: var(--brand-wash); }
+.information-card p { color: var(--muted); }
+.information-faq details { border-top: 1px solid var(--line); }
+.information-faq summary { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .75rem 0; color: var(--ink); }
+.information-faq summary::-webkit-details-marker { display: none; }
+.information-faq details[open] summary svg { transform: rotate(180deg); }
+.information-faq p { margin: 0 0 .8rem; }
+.information-card kbd { padding: .1rem .3rem; border: 1px solid var(--line); border-radius: 4px; background: var(--brand-wash); color: var(--ink); }
+
+@media (max-width: 720px) {
+  .information-layout { grid-template-columns: minmax(0, 1fr); }
+  .information-index { position: static; display: flex; flex-wrap: wrap; }
+}
