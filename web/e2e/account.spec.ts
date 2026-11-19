@@ -169,6 +169,10 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await expect(page.getByRole("status")).toContainText("Palavra-passe atualizada");
     await signIn(newPassword);
     await page.goto("/definicoes");
+    await expect(page.getByRole("link", { name: /Editar perfil/ })).toBeVisible();
+    await page.getByRole("button", { name: "Acesso e segurança" }).click();
+    await expect(page.getByText("Palavra-passe", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Gestão da conta" }).click();
     await page.getByText("Eliminar conta", { exact: true }).click();
     await page.getByLabel("Confirme a palavra-passe").fill(newPassword);
     await page.getByLabel("Escreva ELIMINAR para confirmar").fill("ELIMINAR");

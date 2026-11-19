@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRight, ChevronDown, LockKeyhole, Settings2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
@@ -11,7 +12,14 @@ const settings = [
   ["Eliminar conta", "/auth/account", "DELETE", "Eliminar definitivamente"],
 ] as const;
 
+const categories = [
+  { id: "perfil", label: "Perfil académico", icon: UserRound },
+  { id: "seguranca", label: "Acesso e segurança", icon: LockKeyhole },
+  { id: "conta", label: "Gestão da conta", icon: Settings2 },
+] as const;
+
 export default function Page() {
+  const [category, setCategory] = useState<(typeof categories)[number]["id"]>("perfil");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<{ path: string; text: string; error?: boolean }>();
@@ -19,6 +27,7 @@ export default function Page() {
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("email") === "confirmado") {
+      setCategory("seguranca");
       setFeedback({ path: "/auth/email", text: "Novo email confirmado." });
     }
     api<{ email: string }>("/profiles/me").then((profile) => setEmail(profile.email)).catch((failure) => setError(message(failure)));
@@ -43,27 +52,51 @@ export default function Page() {
     }
   }
 
-  return <main className="site-width profile-shell">
+  return <main className="site-width profile-shell settings-shell">
     <h1>Definições</h1>
-    {error ? <p role="alert">{error} <Link href="/entrar">Entrar</Link></p> : !email ?
-      <p role="status">A carregar…</p> : <div className="network-stack">{settings.map(([title, path, method, button]) =>
-      <details className="panel settings-panel" key={path} open={feedback?.path === path || undefined}>
-        <summary>{title}</summary>
-        <form className="form-stack" onSubmit={(event) => void submit(event, path, method)}>
-          {path === "/auth/email" && <><p>Email actual: {email}</p>
-            <label>Novo email<input name="email" type="email" maxLength={254} autoComplete="email" required /></label></>}
-          {path === "/auth/deactivate" && <p>O perfil e as publicações ficam ocultos. Volte a iniciar sessão para reactivar a conta.</p>}
-          {method === "DELETE" && <p>A eliminação é definitiva e remove a conta, o perfil e o conteúdo associado.</p>}
-          <label>{method === "DELETE" ? "Confirme a palavra-passe" : "Palavra-passe actual"}
-            <input name="password" type="password" maxLength={128} autoComplete="current-password" required />
-          </label>
-          {method === "PUT" && <label>Nova palavra-passe
-            <input name="new_password" type="password" minLength={12} maxLength={128} autoComplete="new-password" required />
-          </label>}
-          {method === "DELETE" && <label>Escreva ELIMINAR para confirmar<input name="confirmation" pattern="ELIMINAR" required /></label>}
-          <button className={method === "DELETE" ? "danger" : "primary"} disabled={busy}>{button}</button>
-          {feedback?.path === path && <p className={feedback.error ? "notice error" : "notice"} role={feedback.error ? "alert" : "status"}>{feedback.text}</p>}
-        </form>
-      </details>)}</div>}
+    <div className="settings-layout">
+      <nav className="panel settings-categories" aria-label="Categorias de definições">
+        {categories.map(({ id, label, icon: Icon }) => (
+          <button key={id} type="button" aria-pressed={category === id} aria-controls={`settings-${id}`}
+            onClick={() => setCategory(id)}>
+            <Icon size={20} aria-hidden="true" /> {label}
+          </button>
+        ))}
+      </nav>
+      <div>
+        <section id="settings-perfil" className="panel settings-content" hidden={category !== "perfil"}>
+          <h2>Perfil académico</h2>
+          <Link className="settings-profile-link" href="/perfil">
+            <span><strong>Editar perfil</strong><small>Nome, fotografia, instituição e visibilidade.</small></span>
+            <ArrowRight size={19} aria-hidden="true" />
+          </Link>
+        </section>
+        {categories.slice(1).map(({ id, label }) => (
+          <section id={`settings-${id}`} className="panel settings-content" hidden={category !== id} key={id}>
+            <h2>{label}</h2>
+            {error ? <p role="alert">{error} <Link href="/entrar">Entrar</Link></p> : !email ?
+              <p role="status">A carregar…</p> : (id === "seguranca" ? settings.slice(0, 2) : settings.slice(2)).map(([title, path, method, button]) =>
+              <details className="settings-panel" key={path} open={feedback?.path === path || undefined}>
+                <summary>{title}<ChevronDown size={17} aria-hidden="true" /></summary>
+                <form className="form-stack" onSubmit={(event) => void submit(event, path, method)}>
+                  {path === "/auth/email" && <><p>Email actual: {email}</p>
+                    <label>Novo email<input name="email" type="email" maxLength={254} autoComplete="email" required /></label></>}
+                  {path === "/auth/deactivate" && <p>O perfil e as publicações ficam ocultos. Volte a iniciar sessão para reactivar a conta.</p>}
+                  {method === "DELETE" && <p>A eliminação é definitiva e remove a conta, o perfil e o conteúdo associado.</p>}
+                  <label>{method === "DELETE" ? "Confirme a palavra-passe" : "Palavra-passe actual"}
+                    <input name="password" type="password" maxLength={128} autoComplete="current-password" required />
+                  </label>
+                  {method === "PUT" && <label>Nova palavra-passe
+                    <input name="new_password" type="password" minLength={12} maxLength={128} autoComplete="new-password" required />
+                  </label>}
+                  {method === "DELETE" && <label>Escreva ELIMINAR para confirmar<input name="confirmation" pattern="ELIMINAR" required /></label>}
+                  <button className={method === "DELETE" ? "danger" : "primary"} disabled={busy}>{button}</button>
+                  {feedback?.path === path && <p className={feedback.error ? "notice error" : "notice"} role={feedback.error ? "alert" : "status"}>{feedback.text}</p>}
+                </form>
+              </details>)}
+          </section>
+        ))}
+      </div>
+    </div>
   </main>;
 }
