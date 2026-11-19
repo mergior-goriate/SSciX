@@ -92,6 +92,19 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     expect((await peer.put(origin + "/api/v1/profiles/me", {
       headers, data: { ...peerProfile, keywords: ["Educação"], is_public: true },
     })).status()).toBe(200);
+    await page.goto("/comunidades");
+    await page.getByRole("button", { name: "Criar comunidade" }).click();
+    const communityForm = page.getByRole("dialog", { name: "Criar comunidade" });
+    await communityForm.getByLabel("Nome", { exact: true }).fill(`Educação ${id}`);
+    await communityForm.getByLabel("Âmbito da comunidade").fill("Investigação e debate académico");
+    await communityForm.getByRole("button", { name: "Criar comunidade" }).click();
+    await expect(communityForm).toBeHidden();
+    const communitySearch = page.getByRole("searchbox", { name: "Pesquisar comunidades" });
+    await communitySearch.fill("inexistente");
+    await expect(page.getByText("Nenhuma comunidade encontrada.")).toBeVisible();
+    await communitySearch.fill(`educacao ${id}`);
+    await page.getByRole("link", { name: new RegExp(`Educação ${id}`) }).click();
+    await expect(page.getByRole("heading", { name: `Educação ${id}` })).toBeVisible();
     await page.goto("/rede");
     const topMenu = page.getByLabel("Abrir menu", { exact: true });
     await topMenu.click();
