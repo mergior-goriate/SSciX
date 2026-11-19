@@ -1,4 +1,6 @@
 import { fetchMemberApi } from "../../member-api";
+import { ArrowRight, Search, Users } from "lucide-react";
+import Avatar from "../avatar";
 import Link from "next/link";
 
 export const metadata = { title: "Encontrar pessoas" };
@@ -24,22 +26,29 @@ export default async function PeoplePage({ searchParams }: {
   const entries: Entry[] = response?.ok ? await response.json() : [];
 
   return (
-    <main className="site-width profile-shell">
-      <section className="panel people-directory">
+    <main className="site-width information-shell">
+      <header className="information-hero">
         <h1>Encontrar pessoas</h1>
+        <span className="information-hero-icon"><Users size={32} aria-hidden="true" /></span>
+      </header>
+      <section className="panel people-directory directory-workspace">
         <form action="/pessoas">
           <label htmlFor="people-query">Nome, instituição ou área de investigação</label>
           <input id="people-query" name="q" defaultValue={q} maxLength={100} type="search" />
-          <button className="primary" type="submit">Pesquisar</button>
+          <button className="primary" type="submit"><Search size={17} aria-hidden="true" /> Pesquisar</button>
         </form>
         {!response?.ok ? <p role="status">A pesquisa está temporariamente indisponível.</p> :
           entries.length === 0 ? <p role="status">Nenhum perfil público encontrado.</p> :
             <ul>
               {entries.slice(0, PAGE_SIZE).map((entry) => (
                 <li key={entry.slug}>
-                  <Link href={`/u/${entry.slug}`}>{entry.name}</Link>
-                  {(entry.institution || entry.specialization) &&
-                    <p className="muted">{[entry.institution, entry.specialization].filter(Boolean).join(" · ")}</p>}
+                  <Link href={`/u/${entry.slug}`}>
+                    <Avatar name={entry.name} />
+                    <span><strong>{entry.name}</strong>
+                      {(entry.institution || entry.specialization) && <small>{[entry.institution, entry.specialization].filter(Boolean).join(" · ")}</small>}
+                    </span>
+                    <ArrowRight size={17} aria-hidden="true" />
+                  </Link>
                 </li>
               ))}
             </ul>}

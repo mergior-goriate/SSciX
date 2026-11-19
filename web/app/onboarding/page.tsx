@@ -25,7 +25,7 @@ export default function Page() {
     }
   }
 
-  return <main className="site-width profile-shell">
+  return <main className="site-width profile-shell onboarding-shell">
     <section className="panel form-stack">
       <p className="notice" role="status">Email confirmado.</p>
       <h1>Escolha os seus temas</h1>

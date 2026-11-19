@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import "./styles.css";
+import "./visual-identity.css";
 import Navigation from "./navigation";
 
 export const metadata: Metadata = {
