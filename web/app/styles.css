@@ -559,3 +559,30 @@ body:has(.account-split) .site-footer { margin-top: 0; }
   .registration-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); }
   .registration-split .account-form { order: -1; }
 }
+
+.settings-shell { max-width: 1020px; }
+.settings-layout { display: grid; grid-template-columns: minmax(210px, .43fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.settings-categories { display: grid; gap: .3rem; padding: .55rem; }
+.settings-categories button {
+  display: flex; gap: .65rem; align-items: center; text-align: start; min-height: 46px;
+  border: 0; border-radius: 8px; padding: .55rem .65rem; background: transparent;
+  color: var(--ink); font: inherit; font-weight: 650; cursor: pointer;
+}
+.settings-categories button:hover, .settings-categories [aria-pressed="true"] { color: var(--brand); background: var(--brand-wash); }
+.settings-content { padding: clamp(16px, 3vw, 30px); }
+.settings-content h2 { margin-bottom: .85rem; }
+.settings-profile-link, .settings-panel summary {
+  display: flex; align-items: center; justify-content: space-between; gap: .65rem;
+  padding: .85rem 0; color: var(--brand); border-top: 1px solid var(--line); text-decoration: none;
+}
+.settings-profile-link:hover, .settings-panel summary:hover { text-decoration: underline; }
+.settings-profile-link small { display: block; }
+.settings-panel summary::-webkit-details-marker { display: none; }
+.settings-panel[open] summary svg { transform: rotate(180deg); }
+.settings-panel form { margin: .15rem 0 1.15rem; max-width: 460px; }
+
+@media (max-width: 700px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .settings-categories { display: flex; flex-wrap: wrap; }
+  .settings-categories button { flex: 1 1 auto; }
+}
