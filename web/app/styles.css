@@ -165,21 +165,17 @@ dd { margin: 0; }
   gap: clamp(.75rem, 1.5vw, 1.2rem); align-items: start;
 }
 @media (min-width: 741px) and (min-height: 480px) {
-  body:has(.feed-shell) {
-    display: grid;
-    grid-template: auto minmax(0, 1fr) auto / minmax(0, 1fr);
-    height: 100dvh;
-    overflow: hidden;
-  }
-  body:has(.feed-shell) .site-header { position: relative; z-index: 2; }
-  body:has(.feed-shell) .site-footer { margin-top: 0; padding-block: .55rem .7rem; }
-  .feed-shell { display: grid; min-height: 0; }
-  .feed-shell > .network-layout { grid-template-rows: minmax(0, 1fr); min-height: 0; }
-  .feed-shell .network-main,
+  body:has(.feed-shell) .site-header { position: sticky; top: 0; z-index: 2; }
   .feed-shell .network-rail,
-  .feed-shell .network-context { max-height: 100%; overflow-y: auto; scrollbar-width: thin; padding-inline: 4px; }
-  .feed-shell .network-main { padding-bottom: .8rem; }
-  .feed-shell .network-main:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+  .feed-shell .network-context {
+    --feed-rail-top: calc(63px + clamp(12px, 2vw, 22px));
+    position: sticky;
+    top: var(--feed-rail-top);
+    max-height: calc(100dvh - var(--feed-rail-top) - .8rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding-inline: 4px;
+  }
 }
 .network-main, .network-context { min-width: 0; }
 .network-context, .network-rail, .profile-main { display: grid; gap: .8rem; align-content: start; }

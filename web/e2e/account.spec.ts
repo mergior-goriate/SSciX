@@ -127,15 +127,19 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await expect(page.getByText("Primeira publicação académica.")).toBeVisible();
     const desktopViewport = page.viewportSize()!;
     await page.setViewportSize({ width: 1280, height: 540 });
-    const fixedElements = [".site-header", ".network-rail", ".network-context", ".site-footer"];
-    const positions = await Promise.all(fixedElements.map((selector) => page.locator(selector).boundingBox()));
-    const feedScrollTop = await page.getByRole("region", { name: "Feed académico" }).evaluate((feed) => {
-      feed.scrollTop = feed.scrollHeight;
-      return feed.scrollTop;
-    });
-    expect(feedScrollTop).toBeGreaterThan(0);
-    expect(await Promise.all(fixedElements.map((selector) => page.locator(selector).boundingBox()))).toEqual(positions);
-    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    const header = page.locator(".site-header");
+    const footer = page.locator(".site-footer");
+    const footerStart = (await footer.boundingBox())!;
+    expect(footerStart.y).toBeGreaterThan(540);
+    const fixedRails = page.locator(".network-rail, .network-context");
+    expect(await fixedRails.evaluateAll((rails) => rails.map((rail) => getComputedStyle(rail).position)))
+      .toEqual(["sticky", "sticky"]);
+    await footer.scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    expect((await header.boundingBox())!.y).toBe(0);
+    await expect(footer).toBeInViewport();
+    expect((await footer.boundingBox())!.y).toBeLessThan(footerStart.y);
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.setViewportSize(desktopViewport);
     const firstPost = page.getByRole("article").filter({ hasText: "Primeira publicação académica." });
     await firstPost.getByRole("button", { name: "Guardar", exact: true }).click();
