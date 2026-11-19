@@ -53,7 +53,10 @@ export default function Page() {
   }
 
   return <main className="site-width profile-shell settings-shell">
-    <h1>Definições</h1>
+    <header className="information-hero">
+      <h1>Definições</h1>
+      <span className="information-hero-icon"><Settings2 size={32} aria-hidden="true" /></span>
+    </header>
     <div className="settings-layout">
       <nav className="panel settings-categories" aria-label="Categorias de definições">
         {categories.map(({ id, label, icon: Icon }) => (
