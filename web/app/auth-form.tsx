@@ -79,11 +79,10 @@ export default function AuthForm({ view }: { view: View }) {
       </form>}
       {feedback && <p className={feedback.error ? "notice error" : "notice"} role={feedback.error ? "alert" : "status"}>{feedback.text}</p>}
       <div className="auth-links">
-        {login ? <>
-          <Link href="/recuperar">Esqueci a palavra-passe</Link>
-          <Link href="/registar">Criar conta</Link>
-        </> : <Link href="/entrar">Voltar à entrada</Link>}
+        {login ? <Link href="/recuperar">Esqueci a palavra-passe</Link>
+          : <Link href="/entrar">Voltar à entrada</Link>}
         {(login || registration || view === "confirmar-email") && <Link href="/reenviar-confirmacao">Reenviar confirmação</Link>}
+        {login && <Link href="/registar" className="secondary sign-in-register">Criar conta</Link>}
         {view === "nova-palavra-passe" && <Link href="/recuperar">Pedir novo link</Link>}
       </div>
     </div>

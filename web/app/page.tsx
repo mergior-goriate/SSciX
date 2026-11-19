@@ -1,3 +1,4 @@
+import AcademicAtlas from "./academic-atlas";
 import Link from "next/link";
 
 export default function Home() {
@@ -14,10 +15,7 @@ export default function Home() {
             <Link href="/rede" className="secondary">Explorar a rede</Link>
           </div>
         </div>
-        <div className="atlas" aria-hidden="true">
-          <div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit orbit-three" />
-          <div className="orbit-core" /><i className="star star-one" /><i className="star star-two" /><i className="star star-three" />
-        </div>
+        <AcademicAtlas />
       </div>
     </main>
   );
