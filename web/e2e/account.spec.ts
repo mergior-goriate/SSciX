@@ -93,6 +93,13 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
       headers, data: { ...peerProfile, keywords: ["Educação"], is_public: true },
     })).status()).toBe(200);
     await page.goto("/rede");
+    const topMenu = page.getByLabel("Abrir menu", { exact: true });
+    await topMenu.click();
+    const topNavigation = page.getByRole("navigation", { name: "Navegação principal" });
+    for (const name of ["Guardados", "Definições", "Centro de ajuda"]) {
+      await expect(topNavigation.getByRole("link", { name, exact: true })).toHaveCSS("color", "rgb(0, 29, 57)");
+    }
+    await topMenu.click();
     expect(await page.locator(".network-layout").evaluate((layout) =>
       getComputedStyle(layout).gridTemplateColumns.split(" ").length)).toBe(3);
     await page.getByLabel("Criar publicação").fill(`Primeira publicação académica. @${peerSlug}`);
