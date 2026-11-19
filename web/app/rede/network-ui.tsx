@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
-import { ArrowRight, BookOpen, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageSquare, BookOpen, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
 import Avatar from "../avatar";
 import { readImage } from "../media";
 import FollowButton from "../u/[slug]/follow-button";
@@ -289,7 +289,11 @@ export function Feed({ communityId }: { communityId?: string }) {
       <button className="secondary" aria-pressed={!following} onClick={() => setFollowing(false)}>Publicações recentes</button>
       <button className="secondary" aria-pressed={following} onClick={() => setFollowing(true)}>Pessoas que sigo</button>
     </div>}
-    <Posts data={data} error={error} empty="Ainda não há publicações para mostrar." topic />
+    {communityId && data?.length === 0 ? <div className="panel community-empty" role="status">
+      <MessageSquare size={25} aria-hidden="true" />
+      <strong>Ainda não há debates nesta comunidade.</strong>
+      <p>Publique uma pergunta, um resultado ou uma proposta de colaboração.</p>
+    </div> : <Posts data={data} error={error} empty="Ainda não há publicações para mostrar." topic />}
   </div>;
 }
 
@@ -386,11 +390,27 @@ export function CommunityDirectory() {
 
 export function CommunityPage({ id }: { id: string }) {
   const { data, error } = useNetworkData<Community>(`/communities/${id}`);
-  if (error) return <p role="alert">{error}</p>;
-  if (!data) return <p role="status">A carregar a comunidade…</p>;
   return <>
-    <h1>{data.name}</h1>
-    <p className="biography">{data.description}</p>
-    <Feed communityId={id} />
+    <nav aria-label="Percurso da comunidade" className="community-return">
+      <Link href="/comunidades"><ArrowLeft size={18} aria-hidden="true" /> Todas as comunidades</Link>
+    </nav>
+    {error ? <p className="notice error" role="alert">{error}</p> :
+      !data ? <p role="status">A carregar a comunidade…</p> : <>
+        <header className="information-hero community-detail-hero">
+          <span className="information-hero-icon"><Users size={32} aria-hidden="true" /></span>
+          <h1>{data.name}</h1>
+        </header>
+        <div className="community-directory community-detail-grid">
+          <section className="community-debates" aria-labelledby="community-debates-title">
+            <h2 id="community-debates-title">Debates</h2>
+            <Feed communityId={id} />
+          </section>
+          <aside className="panel community-guide community-about">
+            <h2><BookOpen size={20} aria-hidden="true" /> Sobre a comunidade</h2>
+            <p className="biography muted">{data.description}</p>
+            <Link href="/ajuda#comunidades">Políticas das comunidades</Link>
+          </aside>
+        </div>
+      </>}
   </>;
 }

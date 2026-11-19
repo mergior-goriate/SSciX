@@ -691,3 +691,20 @@ body:has(.account-split) .site-footer { margin-top: 0; }
 @media (max-width: 720px) {
   .community-directory { grid-template-columns: minmax(0, 1fr); }
 }
+
+.community-return { margin-bottom: .8rem; }
+.community-return a { display: inline-flex; align-items: center; gap: .45rem; font-weight: 650; text-decoration: none; }
+.community-return a:hover { text-decoration: underline; }
+.community-detail-hero { justify-content: flex-start; gap: clamp(.7rem, 3vw, 1.3rem); }
+.community-detail-hero h1 { min-width: 0; overflow-wrap: anywhere; }
+.community-debates { min-width: 0; }
+.community-debates h2 { margin: .15rem 0 .65rem; }
+.community-debates .network-composer { margin-top: 0; }
+.community-debates .panel { padding: clamp(15px, 3vw, 25px); }
+.community-about p { overflow-wrap: anywhere; }
+.community-empty { display: grid; justify-items: center; gap: .35rem; text-align: center; color: var(--brand); }
+.community-empty p { color: var(--muted); margin: 0; }
+
+@media (max-width: 720px) {
+  .community-detail-grid .community-about { grid-row: 1; }
+}
