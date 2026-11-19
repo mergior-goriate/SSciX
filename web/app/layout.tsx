@@ -30,8 +30,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
         {children}
         <footer className="site-width site-footer">
-          <span>SSciX · Scientific Social Connection</span>
-          <Link href="/termos">Termos de utilização</Link>
+          <nav aria-label="Ligações do rodapé">
+            <Link href="/ajuda">Centro de ajuda</Link>
+            <Link href="/ajuda#comunidades">Políticas das comunidades</Link>
+            <Link href="/termos#privacidade">Privacidade</Link>
+            <Link href="/ajuda#acessibilidade">Acessibilidade</Link>
+            <Link href="/ajuda#recomendacoes">Visibilidade das recomendações</Link>
+            <Link href="/termos">Termos de utilização</Link>
+          </nav>
         </footer>
       </body>
     </html>
