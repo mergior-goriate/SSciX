@@ -105,6 +105,13 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await communitySearch.fill(`educacao ${id}`);
     await page.getByRole("link", { name: new RegExp(`Educação ${id}`) }).click();
     await expect(page.getByRole("heading", { name: `Educação ${id}` })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sobre a comunidade" })).toBeVisible();
+    await expect(page.getByText("Ainda não há debates nesta comunidade.")).toBeVisible();
+    await page.getByLabel("Criar publicação").fill("Primeiro debate da comunidade.");
+    await page.getByRole("button", { name: "Publicar", exact: true }).click();
+    await expect(page.getByText("Primeiro debate da comunidade.")).toBeVisible();
+    await page.getByRole("link", { name: "Todas as comunidades" }).click();
+    await expect(page).toHaveURL(/\/comunidades$/);
     await page.goto("/rede");
     const topMenu = page.getByLabel("Abrir menu", { exact: true });
     await topMenu.click();
