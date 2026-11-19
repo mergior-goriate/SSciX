@@ -12,7 +12,7 @@ export function PhotoEditor({ name, photo, change }: {
   return <div className="profile-photo-editor">
     <Avatar name={name} photo={photo} className="initials" />
     <div>
-      <label className="photo-label"><span><Camera size={18} aria-hidden="true" /> {photo ? "Alterar fotografia" : "Adicionar fotografia"}</span>
+      <label className="secondary photo-label own-photo-upload"><span><Camera size={18} aria-hidden="true" /> {photo ? "Alterar fotografia" : "Adicionar fotografia"}</span>
         <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) change(file);
