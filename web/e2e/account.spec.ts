@@ -128,23 +128,21 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     const desktopViewport = page.viewportSize()!;
     await page.setViewportSize({ width: 1280, height: 540 });
     const header = page.locator(".site-header");
-    const footer = page.locator(".site-footer");
-    const footerStart = (await footer.boundingBox())!;
-    expect(footerStart.y).toBeGreaterThan(540);
+    await expect(page.locator(".site-footer")).toBeHidden();
     const fixedRails = page.locator(".network-rail, .network-context");
     expect(await fixedRails.evaluateAll((rails) => rails.map((rail) => getComputedStyle(rail).position)))
       .toEqual(["sticky", "sticky"]);
-    await footer.scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     expect((await header.boundingBox())!.y).toBe(0);
-    await expect(footer).toBeInViewport();
-    expect((await footer.boundingBox())!.y).toBeLessThan(footerStart.y);
+    await expect(page.locator(".site-footer")).toBeHidden();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.setViewportSize(desktopViewport);
     const firstPost = page.getByRole("article").filter({ hasText: "Primeira publicação académica." });
     await firstPost.getByRole("button", { name: "Guardar", exact: true }).click();
     await expect(firstPost.getByRole("button", { name: "Guardado", exact: true })).toBeVisible();
     await page.goto("/guardados");
+    await expect(page.getByRole("navigation", { name: "Ligações do rodapé" })).toBeVisible();
     await expect(page.getByText("Primeira publicação académica.")).toBeVisible();
     await page.getByRole("button", { name: "Com imagem" }).click();
     await expect(page.getByText("Nenhuma publicação neste filtro.")).toBeVisible();

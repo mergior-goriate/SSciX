@@ -160,6 +160,8 @@ dd { margin: 0; }
 .network-stack button[aria-pressed="true"] { background: var(--brand-wash); border-color: var(--brand); }
 
 .feed-shell, .scholar-shell { padding-top: clamp(12px, 2vw, 22px); }
+.feed-shell { padding-bottom: clamp(16px, 3vw, 32px); }
+body:has(.feed-shell) .site-footer { display: none; }
 .network-layout {
   display: grid; grid-template-columns: minmax(155px, .34fr) minmax(0, 1fr) minmax(215px, .39fr);
   gap: clamp(.75rem, 1.5vw, 1.2rem); align-items: start;
