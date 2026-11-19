@@ -23,7 +23,20 @@ type Post = {
   community_name: string | null;
   community_id: string | null;
 };
-type Community = { id: string; name: string; description: string };
+type Community = { id: string; name: string; description: string; photo: string; can_edit_photo: boolean };
+
+function CommunityPortrait({ photo }: { photo?: string }) {
+  return <span className="community-list-icon" aria-hidden="true">
+    {photo ? <img src={photo} alt="" /> : <Users size={22} />}
+  </span>;
+}
+
+function CommunityPhotoInput({ required = false }: { required?: boolean }) {
+  return <label>Fotografia da comunidade
+    <input type="file" name="photo_file" accept="image/png,image/jpeg,image/webp" required={required} />
+    <small>PNG, JPEG ou WebP, até 260 KB.</small>
+  </label>;
+}
 
 export function useNetworkData<T>(path: string, revision = 0) {
   const [data, setData] = useState<T>();
@@ -328,8 +341,10 @@ export function CommunityHighlights() {
     <h2>Comunidades</h2>
     {error ? <p className="muted">{error}</p> : !data ? <p role="status">A carregar…</p> :
       data.length ? <ul>{data.slice(0, 3).map((community) => <li key={community.id}>
-        <Link href={`/comunidades/${community.id}`}>{community.name}</Link>
-        <small>{community.description}</small>
+        <Link className="community-highlight-link" href={`/comunidades/${community.id}`}>
+          <CommunityPortrait photo={community.photo} />
+          <span>{community.name}<small>{community.description}</small></span>
+        </Link>
       </li>)}</ul> : <p className="muted">Ainda não há comunidades.</p>}
     <Link href="/comunidades">Ver comunidades</Link>
   </section>;
@@ -388,7 +403,9 @@ export function CommunityDirectory() {
     setBusy(true);
     setFailure("");
     try {
-      await api("/communities", "POST", Object.fromEntries(new FormData(form)));
+      const { photo_file, ...fields } = Object.fromEntries(new FormData(form));
+      const photo = photo_file instanceof File && photo_file.size ? await readImage(photo_file, 260 * 1024) : "";
+      await api("/communities", "POST", { ...fields, photo });
       form.reset();
       dialog.current?.close();
       setSearch("");
@@ -419,7 +436,7 @@ export function CommunityDirectory() {
           !visible.length ? <p className="muted" role="status">{query ? "Nenhuma comunidade encontrada." : "Ainda não há comunidades."}</p> :
             <ul className="community-list">{visible.map((community) => <li key={community.id}>
               <Link href={`/comunidades/${community.id}`}>
-                <span className="community-list-icon"><Users size={22} aria-hidden="true" /></span>
+                <CommunityPortrait photo={community.photo} />
                 <span><strong>{community.name}</strong><small>{community.description}</small></span>
                 <ArrowRight size={18} aria-hidden="true" />
               </Link>
@@ -441,6 +458,7 @@ export function CommunityDirectory() {
       <form className="form-stack" onSubmit={create}>
         <label>Nome<input name="name" minLength={2} maxLength={120} required /></label>
         <label>Âmbito da comunidade<textarea name="description" rows={3} maxLength={600} required /></label>
+        <CommunityPhotoInput />
         <button className="primary" disabled={busy}>Criar comunidade</button>
         {failure && <p className="notice error" role="alert">{failure}</p>}
       </form>
@@ -450,6 +468,27 @@ export function CommunityDirectory() {
 
 export function CommunityPage({ id }: { id: string }) {
   const { data, error } = useNetworkData<Community>(`/communities/${id}`);
+  const [updatedPhoto, setUpdatedPhoto] = useState<string>();
+  const [photoStatus, setPhotoStatus] = useState<{ text: string; error?: boolean }>();
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const photo = updatedPhoto ?? data?.photo;
+
+  async function savePhoto(file: File | null) {
+    if (savingPhoto) return;
+    setSavingPhoto(true);
+    setPhotoStatus(undefined);
+    try {
+      const photoData = file ? await readImage(file, 260 * 1024) : "";
+      const updated = await api<Community>(`/communities/${id}/photo`, "PUT", { photo: photoData });
+      setUpdatedPhoto(updated.photo ? `${updated.photo}?v=${Date.now()}` : "");
+      setPhotoStatus({ text: file ? "Fotografia guardada." : "Fotografia removida." });
+      return true;
+    } catch (err) {
+      setPhotoStatus({ text: message(err), error: true });
+    } finally {
+      setSavingPhoto(false);
+    }
+  }
   return <>
     <nav aria-label="Percurso da comunidade" className="community-return">
       <Link href="/comunidades"><ArrowLeft size={18} aria-hidden="true" /> Todas as comunidades</Link>
@@ -457,7 +496,7 @@ export function CommunityPage({ id }: { id: string }) {
     {error ? <p className="notice error" role="alert">{error}</p> :
       !data ? <p role="status">A carregar a comunidade…</p> : <>
         <header className="information-hero community-detail-hero">
-          <span className="information-hero-icon"><Users size={32} aria-hidden="true" /></span>
+          <CommunityPortrait photo={photo} />
           <h1>{data.name}</h1>
         </header>
         <div className="community-directory community-detail-grid">
@@ -469,6 +508,17 @@ export function CommunityPage({ id }: { id: string }) {
             <h2><BookOpen size={20} aria-hidden="true" /> Sobre a comunidade</h2>
             <p className="biography muted">{data.description}</p>
             <Link href="/ajuda#comunidades">Políticas das comunidades</Link>
+            {data.can_edit_photo && <form className="form-stack community-photo-form" onSubmit={(event) => {
+              event.preventDefault();
+              const form = event.currentTarget;
+              const file = new FormData(form).get("photo_file");
+              if (file instanceof File && file.size) void savePhoto(file).then((saved) => { if (saved) form.reset(); });
+            }}>
+              <CommunityPhotoInput required />
+              <button className="primary" disabled={savingPhoto}>{photo ? "Alterar fotografia" : "Adicionar fotografia"}</button>
+              {photo && <button className="secondary" type="button" disabled={savingPhoto} onClick={() => void savePhoto(null)}>Remover fotografia</button>}
+              {photoStatus && <p role={photoStatus.error ? "alert" : "status"} className={photoStatus.error ? "notice error" : "notice"}>{photoStatus.text}</p>}
+            </form>}
           </aside>
         </div>
       </>}

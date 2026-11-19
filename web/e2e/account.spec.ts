@@ -97,6 +97,9 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     const communityForm = page.getByRole("dialog", { name: "Criar comunidade" });
     await communityForm.getByLabel("Nome", { exact: true }).fill(`Educação ${id}`);
     await communityForm.getByLabel("Âmbito da comunidade").fill("Investigação e debate académico");
+    const communityPhoto = { name: "comunidade.png", mimeType: "image/png",
+      buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kv9sAAAAASUVORK5CYII=", "base64") };
+    await communityForm.getByLabel(/Fotografia da comunidade/).setInputFiles(communityPhoto);
     await communityForm.getByRole("button", { name: "Criar comunidade" }).click();
     await expect(communityForm).toBeHidden();
     const communitySearch = page.getByRole("searchbox", { name: "Pesquisar comunidades" });
@@ -106,6 +109,18 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await page.getByRole("link", { name: new RegExp(`Educação ${id}`) }).click();
     await expect(page.getByRole("heading", { name: `Educação ${id}` })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Sobre a comunidade" })).toBeVisible();
+    const communityImage = page.locator(".community-detail-hero img");
+    await expect(communityImage).toBeVisible();
+    const photoUrl = new URL((await communityImage.getAttribute("src"))!, origin).href;
+    expect((await peer.get(photoUrl)).headers()["content-type"]).toBe("image/png");
+    expect((await peer.put(photoUrl, { headers, data: { photo: "" } })).status()).toBe(403);
+    await page.getByRole("button", { name: "Remover fotografia" }).click();
+    await expect(page.getByText("Fotografia removida.")).toBeVisible();
+    await expect(communityImage).toHaveCount(0);
+    await page.getByLabel(/Fotografia da comunidade/).setInputFiles(communityPhoto);
+    await page.getByRole("button", { name: "Adicionar fotografia" }).click();
+    await expect(page.getByText("Fotografia guardada.")).toBeVisible();
+    await expect(communityImage).toBeVisible();
     await expect(page.getByText("Ainda não há debates nesta comunidade.")).toBeVisible();
     await page.getByLabel("Criar publicação").fill("Primeiro debate da comunidade.");
     await page.getByRole("button", { name: "Publicar", exact: true }).click();

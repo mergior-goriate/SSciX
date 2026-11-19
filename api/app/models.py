@@ -90,6 +90,7 @@ class Community(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(120), unique=True)
     description: Mapped[str] = mapped_column(String(600))
+    photo: Mapped[str] = mapped_column(Text, server_default="")
     owner_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"))
 
 

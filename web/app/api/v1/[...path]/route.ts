@@ -19,7 +19,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (request.body) {
     const reader = request.body.getReader();
     const route = path.join("/");
-    const limit = request.method === "PUT" && route === "profiles/me" ? 425000
+    const communityPhoto = (request.method === "POST" && route === "communities")
+      || (request.method === "PUT" && /^communities\/[a-f0-9-]{36}\/photo$/i.test(route));
+    const limit = communityPhoto || (request.method === "PUT" && route === "profiles/me") ? 425000
       : request.method === "POST" && route === "feed" ? 750000 : MAX_BODY;
     const bytes = new Uint8Array(limit);
     let size = 0;

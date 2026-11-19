@@ -3,7 +3,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field, StringConstraints, field_validator
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints, field_validator
 from sqlalchemy import delete, false, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
@@ -24,8 +24,21 @@ class CommunityInput(Input):
     description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=600)]
 
 
+CommunityPhotoData = Annotated[str, Field(max_length=360_000), AfterValidator(image_data)]
+
+
+class CommunityPhoto(Input):
+    photo: CommunityPhotoData
+
+
 class CommunityView(CommunityInput):
     id: UUID
+    photo: str = ""
+    can_edit_photo: bool = False
+
+
+class CommunityCreate(CommunityInput):
+    photo: CommunityPhotoData = ""
 
 
 class ReplyInput(Input):
@@ -94,21 +107,54 @@ def public_author(db: DB, request: Request):
     return profile
 
 
-@router.get("/communities", response_model=list[CommunityView])
-def communities(db: DB):
-    return db.scalars(select(Community).order_by(Community.name).limit(100)).all()
+def community_photo_url(community_id: UUID, has_photo: bool):
+    return f"/api/v1/communities/{community_id}/photo" if has_photo else ""
 
 
-@router.get("/communities/{community_id}", response_model=CommunityView)
-def community(community_id: UUID, db: DB):
+def get_community(community_id: UUID, db: DB):
     value = db.get(Community, community_id)
     if value is None:
         raise HTTPException(404, "Comunidade indisponível.")
     return value
 
 
+def community_view(value: Community, user_id: UUID):
+    return CommunityView(id=value.id, name=value.name, description=value.description,
+                         photo=community_photo_url(value.id, bool(value.photo)),
+                         can_edit_photo=value.owner_id == user_id)
+
+
+@router.get("/communities", response_model=list[CommunityView])
+def communities(db: DB):
+    rows = db.execute(select(Community.id, Community.name, Community.description, Community.photo != "")
+                      .order_by(Community.name).limit(100))
+    return [CommunityView(id=cid, name=name, description=description, photo=community_photo_url(cid, has_photo))
+            for cid, name, description, has_photo in rows]
+
+
+@router.get("/communities/{community_id}", response_model=CommunityView)
+def community(community_id: UUID, db: DB, user: Member):
+    return community_view(get_community(community_id, db), user.id)
+
+
+@router.get("/communities/{community_id}/photo")
+def community_photo(community_id: UUID, db: DB):
+    return image_response(get_community(community_id, db).photo)
+
+
+@router.put("/communities/{community_id}/photo", response_model=CommunityView, dependencies=same_origin)
+def update_community_photo(community_id: UUID, data: CommunityPhoto, db: DB, user: Member, request: Request):
+    value = get_community(community_id, db)
+    if value.owner_id != user.id:
+        raise HTTPException(403, "Só o criador pode alterar a fotografia da comunidade.")
+    limit(request, "community-photo", 12, str(user.id))
+    value.photo = data.photo
+    db.commit()
+    return community_view(value, user.id)
+
+
 @router.post("/communities", response_model=CommunityView, status_code=201, dependencies=same_origin)
-def create_community(data: CommunityInput, db: DB, request: Request):
+def create_community(data: CommunityCreate, db: DB, request: Request):
     author = public_author(db, request)
     value = Community(**data.model_dump(), owner_id=author.user_id)
     db.add(value)
@@ -117,7 +163,7 @@ def create_community(data: CommunityInput, db: DB, request: Request):
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "Já existe uma comunidade com esse nome.") from None
-    return value
+    return community_view(value, author.user_id)
 
 
 @router.get("/feed", response_model=list[PostView])
@@ -129,7 +175,7 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
     if author is not None:
         conditions.append(Profile.slug == author)
     if community_id is not None:
-        community(community_id, db)
+        get_community(community_id, db)
         conditions.append(Discussion.community_id == community_id)
     return read_posts(db, *conditions, viewer=viewer)
 
@@ -138,7 +184,7 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
 def publish(data: PostInput, db: DB, request: Request):
     author = public_author(db, request)
     if data.community_id is not None:
-        community(data.community_id, db)
+        get_community(data.community_id, db)
     post = Discussion(**data.model_dump(), author_id=author.user_id)
     db.add(post)
     db.flush()
