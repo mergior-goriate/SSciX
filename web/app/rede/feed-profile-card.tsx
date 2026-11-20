@@ -13,7 +13,10 @@ export default function FeedProfileCard() {
 
   return <Link href="/perfil" className="panel feed-profile-card"
     aria-label={profile ? `Meu perfil: ${profile.name}` : "Meu perfil"}>
-    <span className="feed-profile-cover" aria-hidden="true" />
+    <span className="feed-profile-cover" aria-hidden="true"
+      style={profile?.has_cover ? {
+        background: "center / cover no-repeat url('/api/v1/profiles/me/cover'), var(--orbit-wash), var(--network-surface)",
+      } : undefined} />
     <div className="feed-profile-body">
       {profile
         ? <Avatar name={profile.name} photo={profile.photo} className="feed-profile-avatar" />
