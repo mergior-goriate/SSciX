@@ -1,0 +1,37 @@
+.admin-shell { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 1.25rem; align-items: start; padding-block: 1.8rem; }
+.admin-rail { position: sticky; top: 1rem; padding: 1rem; display: grid; gap: .7rem; }
+.admin-rail p { margin: 0; }
+.admin-rail nav, .admin-main { display: grid; gap: .55rem; min-width: 0; }
+.admin-rail nav button { background: transparent; color: var(--ink); border: 0; padding: .55rem; border-radius: .45rem; text-align: left; font: inherit; cursor: pointer; }
+.admin-rail nav button:hover, .admin-rail nav button[aria-current] { background: var(--brand-wash); color: var(--brand); }
+.admin-main { gap: 1rem; }
+.admin-main > h1 { margin: 0; font-size: clamp(1.6rem, 3.2vw, 2.5rem); }
+.admin-main .panel { padding: 1rem; }
+.admin-filters, .admin-period, .admin-record-heading { display: flex; align-items: end; flex-wrap: wrap; gap: .75rem; }
+.admin-period, .admin-record-heading { justify-content: space-between; align-items: center; }
+.admin-period p { margin: 0; }
+.admin-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: .75rem; }
+.admin-metrics h2 { font-size: .96rem; margin-bottom: .25rem; }
+.admin-metrics strong { display: block; font-size: 1.65rem; font-variant-numeric: tabular-nums; color: var(--brand); }
+.admin-metrics button { border: 0; padding: 0; display: block; background: none; color: var(--brand); text-decoration: underline; font: inherit; cursor: pointer; }
+.admin-table { overflow-x: auto; }
+.admin-table table { width: 100%; text-align: left; border-collapse: collapse; }
+.admin-table :is(th, td) { vertical-align: top; padding: .65rem; border-bottom: 1px solid var(--line); }
+.admin-table th small { display: block; font-weight: normal; }
+.admin-table td { overflow-wrap: anywhere; }
+.admin-chart { height: 145px; display: flex; align-items: stretch; gap: 2px; padding-top: .5rem; border-bottom: 1px solid var(--line); margin-block: .65rem; }
+.admin-chart div { flex: 1; display: flex; align-items: flex-end; min-width: 1px; }
+.admin-chart span { display: block; background: var(--brand); width: 100%; min-width: 1px; border-radius: 2px 2px 0 0; }
+.admin-detail dd, .admin-record p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.admin-detail dt { font-weight: 700; }
+.admin-detail dd { margin: 0 0 .7rem; }
+.admin-attachment { width: min(100%, 420px); max-height: 320px; object-fit: contain; }
+.admin-dialog { position: fixed; inset: 8vh 0 auto; z-index: 100; width: min(92vw, 490px); max-height: 84vh; overflow: auto;  }
+.admin-dialog form, .report-dialog form { margin-top: 0; }
+@media (max-width: 800px) {
+  .admin-shell { grid-template-columns: minmax(0, 1fr); }
+  .admin-rail { position: static; }
+  .admin-rail nav { display: flex; flex-wrap: wrap; }
+}
+
+.admin-dialog::backdrop { background: #001d3977; }

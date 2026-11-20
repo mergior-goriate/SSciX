@@ -1,3 +1,4 @@
+import ReportButton from "../../report-button";
 import { fetchMemberApi } from "../../../member-api";
 import Link from "next/link";
 import { Link as LinkIcon, MessageSquare } from "lucide-react";
@@ -51,6 +52,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
                 </a>}
               </div>
               <div className="scholar-actions">
+                <ReportButton kind="profile" id={profile.slug} label="Denunciar perfil" />
                 <FollowButton key={profile.slug} slug={profile.slug} showCounts />
                 <Link className="secondary icon-action" href={`/mensagens/${profile.slug}`}>
                   <MessageSquare size={17} aria-hidden="true" /> Enviar mensagem

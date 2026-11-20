@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, FileText, Image as ImageIcon, LockKeyhole, Messa
 import Avatar from "../avatar";
 import { readImage } from "../media";
 import FollowButton from "../u/[slug]/follow-button";
+import ReportButton from "../report-button";
 import ReadingParticipants from "./reading-participants";
 
 const opportunityLabels = {
@@ -320,6 +321,10 @@ function PostCard({ post, topic, onChange }: { post: Post; topic?: boolean; onCh
       <LinkIcon size={17} aria-hidden="true" /> {isOpportunity(post.kind) ? "Consultar anúncio" : "Abrir artigo"}
     </a>}
     {topic && <PostActions post={post} onChange={onChange} />}
+    <div className="profile-actions report-actions">
+      <ReportButton kind="post" id={post.id} />
+      {(post.image || post.article_url) && <ReportButton kind="attachment" id={post.id} label="Denunciar anexo" />}
+    </div>
   </article>;
 }
 
@@ -676,6 +681,7 @@ export function CommunityPage({ id }: { id: string }) {
             <h2><BookOpen size={20} aria-hidden="true" /> Sobre a comunidade</h2>
             <p className="biography muted">{data.description}</p>
             <Link href="/ajuda#comunidades">Políticas das comunidades</Link>
+            <ReportButton kind="community" id={id} label="Denunciar comunidade" />
             {data.can_edit_photo && <form className="form-stack community-photo-form" onSubmit={(event) => {
               event.preventDefault();
               const form = event.currentTarget;

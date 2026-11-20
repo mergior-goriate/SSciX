@@ -4,6 +4,7 @@ import Link from "next/link";
 import "./styles.css";
 import "./visual-identity.css";
 import Navigation from "./navigation";
+import UsageTracker from "./usage-tracker";
 
 export const metadata: Metadata = {
   title: { default: "SSciX | Rede académica", template: "%s | SSciX" },
@@ -14,6 +15,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-MZ">
       <body>
+        <UsageTracker />
         <header className="site-header">
           <div className="site-width header-inner">
             <div className="header-brand-search">

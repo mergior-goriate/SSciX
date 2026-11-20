@@ -85,11 +85,19 @@ class PostView(BaseModel):
     can_resolve: bool = False
 
 
+def visible_content():
+    return (
+        Discussion.moderation_hidden.is_(False),
+        Discussion.community_id.is_(None) | Discussion.community_id.in_(
+            select(Community.id).where(Community.moderation_hidden.is_(False))),
+    )
+
+
 def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
                viewer: UUID | None = None, offset: int = 0, popular: bool = False):
     date_order = Discussion.created_at.desc() if newest else Discussion.created_at
     likes = select(func.count()).select_from(Reaction).join(User).where(
-        Reaction.post_id == Discussion.id, User.deactivated_at.is_(None),
+        Reaction.post_id == Discussion.id, User.deactivated_at.is_(None), User.suspended.is_(False),
     ).correlate(Discussion).scalar_subquery()
     liked, saved = false(), false()
     if viewer:
@@ -100,7 +108,7 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
         .join(Profile, Profile.user_id == Discussion.author_id)
         .join(User, User.id == Profile.user_id)
         .outerjoin(Community, Community.id == Discussion.community_id)
-        .where(Profile.is_public.is_(True), User.deactivated_at.is_(None), *conditions)
+        .where(Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False), *visible_content(), *conditions)
         .order_by(*([likes.desc()] if popular else []), date_order, Discussion.id)
         .offset(offset)
         .limit(page_size)
@@ -109,8 +117,8 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
         PostView(
             id=post.id, body=post.body, author_name=author.name, author_slug=author.slug,
             created_at=post.created_at.isoformat(), community_id=post.community_id, community_name=community,
-            author_photo=photo_url(author), image=f"/api/v1/feed/{post.id}/image" if post.image else "",
-            article_url=post.article_url, likes=likes, liked=liked, saved=saved,
+            author_photo=photo_url(author), image=f"/api/v1/feed/{post.id}/image" if post.image and not post.attachment_hidden else "",
+            article_url=post.article_url if not post.attachment_hidden else "", likes=likes, liked=liked, saved=saved,
             kind=post.kind, title=post.title, scheduled_date=post.scheduled_date, resolved=post.resolved,
             can_resolve=post.kind in CLOSABLE_KINDS and post.author_id == viewer,
         )
@@ -121,7 +129,7 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
 def public_author(db: DB, request: Request):
     user = get_user(db, request, for_update=True)
     profile = db.get(Profile, user.id, with_for_update={"key_share": True})
-    if not profile.is_public:
+    if not profile.is_public or profile.moderation_hidden:
         raise HTTPException(403, "Torne o seu perfil público para participar na rede académica.")
     limit(request, "network-write", 30, str(user.id))
     return profile
@@ -133,7 +141,7 @@ def community_photo_url(community_id: UUID, has_photo: bool):
 
 def get_community(community_id: UUID, db: DB):
     value = db.get(Community, community_id)
-    if value is None:
+    if value is None or value.moderation_hidden:
         raise HTTPException(404, "Comunidade indisponível.")
     return value
 
@@ -147,7 +155,7 @@ def community_view(value: Community, user_id: UUID):
 @router.get("/communities", response_model=list[CommunityView])
 def communities(db: DB):
     rows = db.execute(select(Community.id, Community.name, Community.description, Community.photo != "")
-                      .order_by(Community.name).limit(100))
+                      .where(Community.moderation_hidden.is_(False)).order_by(Community.name).limit(100))
     return [CommunityView(id=cid, name=name, description=description, photo=community_photo_url(cid, has_photo))
             for cid, name, description, has_photo in rows]
 
@@ -204,9 +212,9 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
         get_community(community_id, db)
         conditions.append(Discussion.community_id == community_id)
     if content == "articles":
-        conditions.extend((Discussion.article_url != "", Discussion.kind.not_in(OPPORTUNITY_KINDS)))
+        conditions.extend((Discussion.article_url != "", Discussion.attachment_hidden.is_(False), Discussion.kind.not_in(OPPORTUNITY_KINDS)))
     elif content == "images":
-        conditions.append(Discussion.image != "")
+        conditions.extend((Discussion.image != "", Discussion.attachment_hidden.is_(False)))
     elif content == "opportunities":
         conditions.append(Discussion.kind.in_(OPPORTUNITY_KINDS))
         if opportunity_kind:
@@ -297,7 +305,7 @@ def reading_participants(post_id: UUID, db: DB, user: Member, response: Response
         select(ReadingParticipant, Profile).join(Profile, Profile.user_id == ReadingParticipant.user_id)
         .join(User, User.id == ReadingParticipant.user_id)
         .where(ReadingParticipant.post_id == post_id, ReadingParticipant.user_id != user.id,
-               User.deactivated_at.is_(None))
+               User.deactivated_at.is_(None), User.suspended.is_(False))
         .order_by(Profile.name, Profile.slug)
     )
     return {"joined": True, "whatsapp": own.whatsapp, "participants": [
@@ -327,8 +335,8 @@ def leave_reading(post_id: UUID, db: DB, user: Member, request: Request):
 def post_image(post_id: UUID, db: DB):
     post = db.scalar(select(Discussion).join(Profile, Profile.user_id == Discussion.author_id).join(
         User, User.id == Profile.user_id,
-    ).where(Discussion.id == post_id, Discussion.parent_id.is_(None), Profile.is_public.is_(True),
-            User.deactivated_at.is_(None)))
+    ).where(Discussion.id == post_id, Discussion.parent_id.is_(None), Profile.is_public.is_(True), Profile.moderation_hidden.is_(False),
+            User.deactivated_at.is_(None), User.suspended.is_(False), *visible_content(), Discussion.attachment_hidden.is_(False)))
     return image_response(post.image if post else "")
 
 
@@ -338,7 +346,7 @@ def replies(post_id: UUID, db: DB):
     parent, author = aliased(Discussion), aliased(Profile)
     visible_parent = select(parent.id).join(author, author.user_id == parent.author_id).join(
         User, User.id == author.user_id,
-    ).where(author.is_public.is_(True), User.deactivated_at.is_(None))
+    ).where(author.is_public.is_(True), User.deactivated_at.is_(None), User.suspended.is_(False))
     return read_posts(db, Discussion.parent_id == post_id, Discussion.parent_id.in_(visible_parent), newest=False)
 
 
@@ -361,7 +369,7 @@ def record_mentions(db: DB, post: Discussion, reply_recipient: UUID | None = Non
     recipients = set()
     if slugs:
         recipients.update(db.scalars(select(Profile.user_id).join(User).where(
-            Profile.slug.in_(slugs), Profile.user_id != post.author_id, User.deactivated_at.is_(None),
+            Profile.slug.in_(slugs), Profile.user_id != post.author_id, User.deactivated_at.is_(None), User.suspended.is_(False),
         )))
     if reply_recipient is not None and reply_recipient != post.author_id:
         recipients.add(reply_recipient)
@@ -413,15 +421,15 @@ def notifications(db: DB, request: Request):
     parent, parent_profile, parent_user = aliased(Discussion), aliased(Profile), aliased(User)
     visible_parents = select(parent.id).join(parent_profile, parent_profile.user_id == parent.author_id).join(
         parent_user, parent_user.id == parent_profile.user_id,
-    ).where(parent_profile.is_public.is_(True), parent_user.deactivated_at.is_(None))
+    ).where(parent_profile.is_public.is_(True), parent_user.deactivated_at.is_(None), parent_user.suspended.is_(False), parent.moderation_hidden.is_(False), parent_profile.moderation_hidden.is_(False))
     collaboration_reply = select(parent.id).where(
         parent.id == Discussion.parent_id, parent.kind == "collaboration", parent.author_id == user.id,
     ).exists()
     query = (
         select(Mention, Discussion, Profile, collaboration_reply).join(Discussion, Discussion.id == Mention.post_id)
         .join(Profile, Profile.user_id == Discussion.author_id).join(User, User.id == Profile.user_id)
-        .where(Mention.recipient_id == user.id, Profile.is_public.is_(True), User.deactivated_at.is_(None),
-               Discussion.parent_id.is_(None) | Discussion.parent_id.in_(visible_parents))
+        .where(Mention.recipient_id == user.id, Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False),
+               *visible_content(), Discussion.parent_id.is_(None) | Discussion.parent_id.in_(visible_parents))
         .order_by(Discussion.created_at.desc(), Discussion.id).limit(40)
     )
     return [

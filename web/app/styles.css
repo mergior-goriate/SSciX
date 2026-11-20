@@ -830,3 +830,7 @@ body:has(.account-split) .site-footer { margin-top: 0; }
 .cover-notice { margin: .5rem .75rem 0; }
 
 .own-profile-identity, .scholar-identity { position: relative; }
+.report-dialog { width: min(92vw, 450px); }
+.report-dialog::backdrop { background: #001d3977; }
+.report-actions { margin-top: .65rem; }
+.report-control > button { font-size: .8rem; min-height: 32px; padding: .3rem .6rem; }

@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DatabaseSession
 
 from . import schemas
+from .admin_models import AdminGrant, UsageEvent
 from .db import get_db
 from .mail import send_link
 from .models import EmailToken, Profile, Session, User
@@ -25,7 +26,7 @@ def get_user(db: DB, request: Request, *, for_update: bool = False) -> User:
         raise HTTPException(401, "Inicie sessão para continuar.")
     query = select(User).join(Session).where(
         Session.digest == digest(secret), Session.expires_at > now(), User.verified_at.is_not(None),
-        User.deactivated_at.is_(None),
+        User.deactivated_at.is_(None), User.suspended.is_(False),
     )
     user = db.scalar(query.with_for_update(of=User) if for_update else query)
     if user is None or (for_update and db.scalar(query) is None):
@@ -126,7 +127,10 @@ def login(data: schemas.Login, request: Request, response: Response, db: DB):
         raise HTTPException(401, "Email ou palavra-passe incorretos.")
     if user.verified_at is None:
         raise HTTPException(403, "Confirme o endereço de email antes de entrar.")
+    if user.suspended:
+        raise HTTPException(403, "Esta conta está suspensa.")
     user.deactivated_at = None
+    db.add(UsageEvent(user_id=user.id, kind="login"))
     start_session(user, request, response, db)
 
 
@@ -137,6 +141,7 @@ def start_session(user: User, request: Request, response: Response, db: DB):
     db.execute(delete(Session).where(Session.user_id == user.id, Session.expires_at <= now()))
     secret = token()
     db.add(Session(digest=digest(secret), user_id=user.id, expires_at=expires(SESSION_SECONDS)))
+    db.add(UsageEvent(user_id=user.id, kind="session", session_key=digest("usage:" + secret)))
     db.commit()
     set_session(response, secret)
 
@@ -156,6 +161,8 @@ def delete_account(data: schemas.DeleteAccount, request: Request, response: Resp
     limit(request, "delete-user", 8, str(user.id))
     if not password_matches(data.password, user.password_hash):
         raise HTTPException(403, "Palavra-passe incorreta.")
+    if db.get(AdminGrant, user.id):
+        raise HTTPException(409, "Remova a função administrativa antes de eliminar a conta.")
     db.delete(user)
     db.commit()
     clear_session(response)
@@ -198,7 +205,7 @@ def confirm_email_change(data: schemas.ConfirmEmail, request: Request, response:
     email = db.scalar(select(EmailToken.pending_email).where(EmailToken.digest == digest(data.token)))
     user = consume_email_token(db, data.token, "change-email")
     check_password(data.password, user)
-    if not email or user.deactivated_at is not None:
+    if not email or user.deactivated_at is not None or user.suspended:
         raise HTTPException(400, "O link é inválido ou expirou.")
     user.email = email
     db.execute(delete(Session).where(Session.user_id == user.id))
@@ -215,6 +222,8 @@ def deactivate(data: schemas.DeleteAccount, request: Request, response: Response
     user = get_user(db, request, for_update=True)
     limit(request, "settings-deactivate", 8, str(user.id))
     check_password(data.password, user)
+    if db.get(AdminGrant, user.id):
+        raise HTTPException(409, "Remova a função administrativa antes de desactivar a conta.")
     user.deactivated_at = now()
     db.execute(delete(Session).where(Session.user_id == user.id))
     db.execute(delete(EmailToken).where(EmailToken.user_id == user.id))

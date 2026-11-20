@@ -31,26 +31,26 @@ def inbox(db: DB, request: Request):
         .ext(distinct_on(other)).order_by(other, DirectMessage.created_at.desc(), DirectMessage.id.desc()).subquery()
     )
     query = (
-        select(Profile, latest.c.activity, latest.c.body, User.deactivated_at)
+        select(Profile, latest.c.activity, latest.c.body, User.deactivated_at, User.suspended)
         .join(latest, latest.c.peer_id == Profile.user_id).join(User)
         .order_by(latest.c.activity.desc(), latest.c.id.desc()).limit(50)
     )
     return [
         {"slug": profile.slug, "name": profile.name, "activity": activity, "preview": body,
-         "photo": photo_url(profile) if profile.is_public and deactivated is None else ""}
-        for profile, activity, body, deactivated in db.execute(query)
+         "photo": photo_url(profile) if profile.is_public and not profile.moderation_hidden and deactivated is None and not suspended else ""}
+        for profile, activity, body, deactivated, suspended in db.execute(query)
     ]
 
 
 def peer_profile(slug: str, user_id: UUID, db: DB):
-    result = db.execute(select(Profile, User.deactivated_at).join(User).where(Profile.slug == slug)).one_or_none()
+    result = db.execute(select(Profile, User.deactivated_at, User.suspended).join(User).where(Profile.slug == slug)).one_or_none()
     if result is None or result[0].user_id == user_id:
         raise HTTPException(404, "Conversa indisponível.")
-    profile, deactivated = result
+    profile, deactivated, suspended = result
     existing = select(DirectMessage.id).where(participants(user_id, profile.user_id)).limit(1)
-    if (not profile.is_public or deactivated is not None) and db.scalar(existing) is None:
+    if (not profile.is_public or profile.moderation_hidden or suspended or deactivated is not None) and db.scalar(existing) is None:
         raise HTTPException(404, "Conversa indisponível.")
-    return profile, deactivated is None
+    return profile, deactivated is None and not suspended
 
 
 @router.get("/{slug}")

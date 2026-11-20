@@ -1,5 +1,6 @@
 "use client";
 
+import ReportButton from "../report-button";
 import { ArrowLeft, MessageSquare, MessageSquarePlus, RefreshCw, Search, Send, Smile } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -132,6 +133,7 @@ function Thread({ slug, onSent }: { slug: string; onSent: () => void }) {
           <p>A conversa ainda não tem mensagens.</p>
         </div>}
         <ol aria-label="Histórico de mensagens">{data.messages.map((entry) => <li key={entry.id} className={entry.mine ? "mine" : ""}>
+          {!entry.mine && <ReportButton kind="message" id={entry.id} label="Denunciar mensagem" />}
           <p className="biography">{entry.body}</p>
           <time dateTime={entry.created_at}>{new Date(entry.created_at).toLocaleString("pt-MZ")}</time>
         </li>)}</ol>

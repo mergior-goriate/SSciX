@@ -82,3 +82,7 @@ npm run build
 ```
 
 Consulte [a arquitetura e o plano de implementação](docs/arquitetura.md) para o modelo de dados, o contrato HTTP e a evolução por etapas.
+
+## Administração da SSciX
+
+Consulte [o guia de administração](docs/administracao.md) para configurar o primeiro acesso, atribuir funções e interpretar os indicadores.

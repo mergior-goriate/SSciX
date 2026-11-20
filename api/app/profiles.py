@@ -78,7 +78,7 @@ class FollowStatus(BaseModel):
 
 @router.get("", response_model=list[DirectoryProfile])
 def directory(db: DB, q: str = Query(default="", max_length=100), offset: int = Query(default=0, ge=0, le=1_999_980)):
-    query = select(Profile).join(User).where(Profile.is_public.is_(True), User.deactivated_at.is_(None))
+    query = select(Profile).join(User).where(Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False))
     term = q.strip()
     if term:
         query = query.where(or_(
@@ -90,7 +90,7 @@ def directory(db: DB, q: str = Query(default="", max_length=100), offset: int = 
 
 
 def find_public_profile(db: DB, slug: str, *, lock: bool = False) -> Profile:
-    query = select(Profile).join(User).where(Profile.slug == slug, Profile.is_public.is_(True), User.deactivated_at.is_(None))
+    query = select(Profile).join(User).where(Profile.slug == slug, Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False))
     profile = db.scalar(query.with_for_update(of=Profile, key_share=True) if lock else query)
     if profile is None:
         raise HTTPException(404, "Perfil indisponível.")
@@ -107,7 +107,7 @@ def suggestions(db: DB, user: Member, similar_to: Slug | None = None):
     reference = find_public_profile(db, similar_to) if similar_to else db.get(Profile, user.id)
     keywords = reference.keywords
     query = select(Profile).join(User).where(
-        Profile.is_public.is_(True), User.deactivated_at.is_(None), Profile.user_id != reference.user_id,
+        Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False), Profile.user_id != reference.user_id,
     )
     query = query.where(Profile.user_id != user.id, Profile.user_id.not_in(
         select(Follow.followed_id).where(Follow.follower_id == user.id)
@@ -166,9 +166,9 @@ def own_counts(db: DB, request: Request):
 
 def counts(db: DB, profile: Profile) -> dict:
     followers = db.scalar(select(func.count()).select_from(Follow).join(User, User.id == Follow.follower_id)
-                          .where(Follow.followed_id == profile.user_id, User.deactivated_at.is_(None)))
+                          .where(Follow.followed_id == profile.user_id, User.deactivated_at.is_(None), User.suspended.is_(False)))
     following = db.scalar(select(func.count()).select_from(Follow).join(User, User.id == Follow.followed_id)
-                          .where(Follow.follower_id == profile.user_id, User.deactivated_at.is_(None)))
+                          .where(Follow.follower_id == profile.user_id, User.deactivated_at.is_(None), User.suspended.is_(False)))
     return {"followers": followers, "following_count": following}
 
 

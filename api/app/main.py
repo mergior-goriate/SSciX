@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from . import auth, messages, network, profiles
+from . import admin, analytics, auth, messages, network, profiles
 
 app = FastAPI(title="SSciX API", version="0.1.0", docs_url="/api/v1/docs",
               openapi_url="/api/v1/openapi.json", redoc_url=None)
@@ -47,5 +47,9 @@ def session_status():
 members.include_router(profiles.router)
 members.include_router(network.router)
 members.include_router(messages.router)
+members.include_router(admin.router)
+members.include_router(admin.report_router)
+members.include_router(analytics.events)
+members.include_router(analytics.router)
 v1.include_router(members)
 app.include_router(v1)

@@ -9,6 +9,7 @@ from .db import Base
 
 class User(Base):
     __tablename__ = "users"
+    suspended: Mapped[bool] = mapped_column(Boolean, server_default="false")
     __table_args__ = (CheckConstraint("role IN ('user', 'moderator', 'admin')", name="valid_role"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -23,6 +24,7 @@ class User(Base):
 
 class Profile(Base):
     __tablename__ = "profiles"
+    moderation_hidden: Mapped[bool] = mapped_column(Boolean, server_default="false")
     __table_args__ = (
         CheckConstraint("academic_role IN ('other', 'researcher', 'teacher', 'student')", name="valid_academic_role"),
     )
@@ -91,6 +93,7 @@ class Follow(Base):
 
 class Community(Base):
     __tablename__ = "communities"
+    moderation_hidden: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(120), unique=True)
@@ -101,6 +104,8 @@ class Community(Base):
 
 class Discussion(Base):
     __tablename__ = "discussions"
+    moderation_hidden: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    attachment_hidden: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     author_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"), index=True)

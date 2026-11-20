@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, BriefcaseBusiness, CircleHelp, Home, LogOut, Menu, MessageSquare, Settings, UserRound } from "lucide-react";
-import { Fragment, useRef, useState } from "react";
+import { Bookmark, BriefcaseBusiness, CircleHelp, Home, Shield, LogOut, Menu, MessageSquare, Settings, UserRound } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { api, message } from "./api-client";
 import NotificationPopover from "./notificacoes/notification-popover";
 
@@ -18,6 +18,13 @@ export default function Navigation() {
   const menu = useRef<HTMLDetailsElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    let active = true;
+    api("/admin/access").then(() => { if (active) setAdmin(true); })
+      .catch(() => { if (active) setAdmin(false); });
+    return () => { active = false; };
+  }, [pathname]);
 
   async function logout() {
     setBusy(true);
@@ -46,6 +53,9 @@ export default function Navigation() {
     <details ref={menu} className="navigation-menu">
       <summary aria-label="Abrir menu" title="Abrir menu"><Menu size={21} aria-hidden="true" /></summary>
       <div className="panel menu-popover">
+        {admin && <Link href="/admin" onClick={() => { if (menu.current) menu.current.open = false; }}>
+          <Shield size={18} aria-hidden="true" /> Administração
+        </Link>}
         <Link href="/guardados" onClick={() => { if (menu.current) menu.current.open = false; }}><Bookmark size={18} aria-hidden="true" /> Guardados</Link>
         <Link href="/oportunidades" onClick={() => { if (menu.current) menu.current.open = false; }}><BriefcaseBusiness size={18} aria-hidden="true" /> Oportunidades</Link>
         <Link href="/definicoes" onClick={() => { if (menu.current) menu.current.open = false; }}><Settings size={18} aria-hidden="true" /> Definições</Link>
