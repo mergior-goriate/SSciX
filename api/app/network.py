@@ -1,8 +1,9 @@
 import re
-from typing import Annotated
+from datetime import date
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import AfterValidator, BaseModel, Field, StringConstraints, field_validator
 from sqlalchemy import delete, false, func, select, update
 from sqlalchemy.dialects.postgresql import insert
@@ -10,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
 from .auth import DB, Member, get_user
-from .models import Bookmark, Community, Discussion, Follow, Mention, Profile, Reaction, User
+from .models import Bookmark, Community, Discussion, Follow, Mention, Profile, Reaction, ReadingParticipant, User
 from .profiles import image_response, photo_url
 from .schemas import Input, Name, Slug, image_data, web_url
 from .security import limit, now, require_origin
@@ -45,10 +46,16 @@ class ReplyInput(Input):
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2400)]
 
 
+PostKind = Literal["post", "collaboration", "reading"]
+
+
 class PostInput(ReplyInput):
     community_id: UUID | None = None
     image: str = Field(default="", max_length=700_000)
     article_url: str = Field(default="", max_length=1000)
+    kind: PostKind = "post"
+    title: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] = ""
+    scheduled_date: date | None = None
 
     _image = field_validator("image")(image_data)
     _url = field_validator("article_url")(web_url)
@@ -68,6 +75,11 @@ class PostView(BaseModel):
     likes: int
     liked: bool = False
     saved: bool = False
+    kind: PostKind
+    title: str
+    scheduled_date: date | None
+    resolved: bool
+    can_resolve: bool = False
 
 
 def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40, viewer: UUID | None = None):
@@ -93,6 +105,8 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40, vi
             created_at=post.created_at.isoformat(), community_id=post.community_id, community_name=community,
             author_photo=photo_url(author), image=f"/api/v1/feed/{post.id}/image" if post.image else "",
             article_url=post.article_url, likes=likes, liked=liked, saved=saved,
+            kind=post.kind, title=post.title, scheduled_date=post.scheduled_date, resolved=post.resolved,
+            can_resolve=post.kind == "collaboration" and post.author_id == viewer,
         )
         for post, author, community, likes, liked, saved in db.execute(query)
     ]
@@ -167,7 +181,8 @@ def create_community(data: CommunityCreate, db: DB, request: Request):
 
 
 @router.get("/feed", response_model=list[PostView])
-def feed(db: DB, user: Member, following: bool = False, community_id: UUID | None = None, author: Slug | None = None):
+def feed(db: DB, user: Member, following: bool = False, community_id: UUID | None = None, author: Slug | None = None,
+         content: Literal["articles", "images", "collaboration", "reading"] | None = None):
     conditions = [Discussion.parent_id.is_(None)]
     viewer = user.id
     if following:
@@ -177,19 +192,31 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
     if community_id is not None:
         get_community(community_id, db)
         conditions.append(Discussion.community_id == community_id)
+    if content == "articles":
+        conditions.append(Discussion.article_url != "")
+    elif content == "images":
+        conditions.append(Discussion.image != "")
+    elif content:
+        conditions.append(Discussion.kind == content)
     return read_posts(db, *conditions, viewer=viewer)
 
 
 @router.post("/feed", status_code=201, response_model=PostView, dependencies=same_origin)
 def publish(data: PostInput, db: DB, request: Request):
     author = public_author(db, request)
+    if data.kind != "post" and (data.community_id is None or not data.title):
+        raise HTTPException(422, "Indique um título e publique a actividade numa comunidade.")
+    if data.kind == "reading" and data.scheduled_date is None:
+        raise HTTPException(422, "Indique a data da sessão de leitura.")
+    if data.kind == "post" and (data.title or data.scheduled_date):
+        raise HTTPException(422, "O título e a data destinam-se às actividades da comunidade.")
     if data.community_id is not None:
         get_community(data.community_id, db)
     post = Discussion(**data.model_dump(), author_id=author.user_id)
     db.add(post)
     db.flush()
     record_mentions(db, post)
-    value = read_posts(db, Discussion.id == post.id)[0]
+    value = read_posts(db, Discussion.id == post.id, viewer=author.user_id)[0]
     db.commit()
     return value
 
@@ -204,6 +231,64 @@ def visible_topic(db: DB, post_id: UUID, viewer: UUID | None = None):
 @router.get("/feed/{post_id}", response_model=PostView)
 def topic(post_id: UUID, db: DB, user: Member):
     return visible_topic(db, post_id, user.id)
+
+
+@router.put("/feed/{post_id}/resolved", response_model=PostView, dependencies=same_origin)
+def resolve_collaboration(post_id: UUID, db: DB, user: Member):
+    topic = visible_topic(db, post_id, user.id)
+    if topic.kind != "collaboration":
+        raise HTTPException(404, "Pedido de colaboração indisponível.")
+    if not topic.can_resolve:
+        raise HTTPException(403, "Só o autor pode marcar este pedido como resolvido.")
+    db.execute(update(Discussion).where(Discussion.id == post_id).values(resolved=True))
+    db.commit()
+    return visible_topic(db, post_id, user.id)
+
+
+class ReadingContact(Input):
+    whatsapp: Annotated[str, StringConstraints(pattern=r"^(?:[1-9][0-9]{6,14})?$")] = ""
+
+
+def require_reading(db: DB, post_id: UUID):
+    if visible_topic(db, post_id).kind != "reading":
+        raise HTTPException(404, "Sessão de leitura indisponível.")
+
+
+@router.get("/feed/{post_id}/participants")
+def reading_participants(post_id: UUID, db: DB, user: Member, response: Response):
+    require_reading(db, post_id)
+    response.headers["Cache-Control"] = "private, no-store"
+    own = db.get(ReadingParticipant, (post_id, user.id))
+    if own is None:
+        return {"joined": False, "whatsapp": "", "participants": []}
+    rows = db.execute(
+        select(ReadingParticipant, Profile).join(Profile, Profile.user_id == ReadingParticipant.user_id)
+        .join(User, User.id == ReadingParticipant.user_id)
+        .where(ReadingParticipant.post_id == post_id, ReadingParticipant.user_id != user.id,
+               User.deactivated_at.is_(None))
+        .order_by(Profile.name, Profile.slug)
+    )
+    return {"joined": True, "whatsapp": own.whatsapp, "participants": [
+        {"slug": profile.slug, "name": profile.name, "whatsapp": participant.whatsapp}
+        for participant, profile in rows
+    ]}
+
+
+@router.put("/feed/{post_id}/participants/me", status_code=204, dependencies=same_origin)
+def join_reading(post_id: UUID, data: ReadingContact, db: DB, user: Member, request: Request):
+    require_reading(db, post_id)
+    limit(request, "reading-participation", 30, str(user.id))
+    db.execute(insert(ReadingParticipant).values(post_id=post_id, user_id=user.id, whatsapp=data.whatsapp)
+               .on_conflict_do_update(index_elements=["post_id", "user_id"], set_={"whatsapp": data.whatsapp}))
+    db.commit()
+
+
+@router.delete("/feed/{post_id}/participants/me", status_code=204, dependencies=same_origin)
+def leave_reading(post_id: UUID, db: DB, user: Member, request: Request):
+    limit(request, "reading-participation", 30, str(user.id))
+    db.execute(delete(ReadingParticipant).where(ReadingParticipant.post_id == post_id,
+                                               ReadingParticipant.user_id == user.id))
+    db.commit()
 
 
 @router.get("/feed/{post_id}/image")
@@ -232,19 +317,22 @@ def reply(post_id: UUID, data: ReplyInput, db: DB, request: Request):
     post = Discussion(body=data.body, author_id=author.user_id, parent_id=topic.id, community_id=topic.community_id)
     db.add(post)
     db.flush()
-    record_mentions(db, post)
+    recipient = db.scalar(select(Discussion.author_id).where(Discussion.id == topic.id)) if topic.kind == "collaboration" else None
+    record_mentions(db, post, recipient)
     value = read_posts(db, Discussion.id == post.id)[0]
     db.commit()
     return value
 
 
-def record_mentions(db: DB, post: Discussion):
+def record_mentions(db: DB, post: Discussion, reply_recipient: UUID | None = None):
     slugs = set(re.findall(r"(?<![\w@])@([a-z0-9]+(?:-[a-z0-9]+)*)(?![\w-])", post.body))
-    if not slugs:
-        return
-    recipients = db.scalars(select(Profile.user_id).join(User).where(
-        Profile.slug.in_(slugs), Profile.user_id != post.author_id, User.deactivated_at.is_(None),
-    ))
+    recipients = set()
+    if slugs:
+        recipients.update(db.scalars(select(Profile.user_id).join(User).where(
+            Profile.slug.in_(slugs), Profile.user_id != post.author_id, User.deactivated_at.is_(None),
+        )))
+    if reply_recipient is not None and reply_recipient != post.author_id:
+        recipients.add(reply_recipient)
     db.add_all(Mention(recipient_id=recipient, post_id=post.id) for recipient in recipients)
 
 
@@ -294,8 +382,11 @@ def notifications(db: DB, request: Request):
     visible_parents = select(parent.id).join(parent_profile, parent_profile.user_id == parent.author_id).join(
         parent_user, parent_user.id == parent_profile.user_id,
     ).where(parent_profile.is_public.is_(True), parent_user.deactivated_at.is_(None))
+    collaboration_reply = select(parent.id).where(
+        parent.id == Discussion.parent_id, parent.kind == "collaboration", parent.author_id == user.id,
+    ).exists()
     query = (
-        select(Mention, Discussion, Profile).join(Discussion, Discussion.id == Mention.post_id)
+        select(Mention, Discussion, Profile, collaboration_reply).join(Discussion, Discussion.id == Mention.post_id)
         .join(Profile, Profile.user_id == Discussion.author_id).join(User, User.id == Profile.user_id)
         .where(Mention.recipient_id == user.id, Profile.is_public.is_(True), User.deactivated_at.is_(None),
                Discussion.parent_id.is_(None) | Discussion.parent_id.in_(visible_parents))
@@ -303,8 +394,8 @@ def notifications(db: DB, request: Request):
     )
     return [
         {"id": post.id, "topic_id": post.parent_id or post.id, "author_name": author.name, "author_photo": photo_url(author),
-         "created_at": post.created_at, "read": mention.read_at is not None}
-        for mention, post, author in db.execute(query)
+         "created_at": post.created_at, "read": mention.read_at is not None, "collaboration_reply": is_reply}
+        for mention, post, author, is_reply in db.execute(query)
     ]
 
 
