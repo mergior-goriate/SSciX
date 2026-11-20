@@ -818,3 +818,7 @@ body:has(.account-split) .site-footer { margin-top: 0; }
   .feed-search-tools { grid-template-columns: minmax(0, 1fr) auto; }
   .feed-search-tools label:last-child { grid-column: 1 / -1; }
 }
+
+.opportunity-filters { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem 1rem; padding: .85rem; }
+.opportunity-filters > label:first-child { flex: 1 1 11rem; }
+.opportunity-filters .check { margin-bottom: .55rem; }

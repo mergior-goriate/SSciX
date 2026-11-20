@@ -269,6 +269,23 @@ def test_social_workflow_permissions(account, app_config):
                           post["image"].removeprefix(root), public["photo"].removeprefix(root)):
                 assert guest.get(f"{root}{route}").status_code == 401
             assert reader.get(f"{root}/session").status_code == 204
+            vacancy = {
+                "kind": "vacancy", "title": "Assistente de investigação",
+                "body": "Candidaturas abertas para um projecto académico.",
+                "article_url": "https://example.com/jobs",
+            }
+            assert author.post(f"{root}/feed", json={**vacancy, "article_url": ""}).status_code == 422
+            assert author.post(f"{root}/feed", json={**vacancy, "scheduled_date": "2000-01-01"}).status_code == 422
+            result = author.post(f"{root}/feed", json=vacancy)
+            assert result.status_code == 201
+            opportunity = result.json()
+            opportunities = {"content": "opportunities", "open_only": True, "opportunity_kind": "vacancy"}
+            assert [post["id"] for post in reader.get(f"{root}/feed", params=opportunities).json()] == [opportunity["id"]]
+            expired_url = f"{root}/feed/{opportunity['id']}/resolved"
+            assert reader.put(expired_url).status_code == 403
+            assert author.put(expired_url).json()["resolved"] is True
+            assert reader.get(f"{root}/feed", params=opportunities).json() == []
+            assert reader.get(f"{root}/feed", params={**opportunities, "open_only": False}).json()[0]["id"] == opportunity["id"]
             assert reader.get(f"{root}/notifications").json()[0]["topic_id"] == post["id"]
             assert reader.put(f"{root}/notifications/{post['id']}/read").status_code == 204
             assert reader.get(f"{root}/notifications").json()[0]["read"] is True

@@ -46,7 +46,10 @@ class ReplyInput(Input):
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2400)]
 
 
-PostKind = Literal["post", "collaboration", "reading"]
+OpportunityKind = Literal["scholarship", "internship", "vacancy", "call"]
+PostKind = Literal["post", "collaboration", "reading", OpportunityKind]
+OPPORTUNITY_KINDS = ("scholarship", "internship", "vacancy", "call")
+CLOSABLE_KINDS = ("collaboration", *OPPORTUNITY_KINDS)
 
 
 class PostInput(ReplyInput):
@@ -109,7 +112,7 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
             author_photo=photo_url(author), image=f"/api/v1/feed/{post.id}/image" if post.image else "",
             article_url=post.article_url, likes=likes, liked=liked, saved=saved,
             kind=post.kind, title=post.title, scheduled_date=post.scheduled_date, resolved=post.resolved,
-            can_resolve=post.kind == "collaboration" and post.author_id == viewer,
+            can_resolve=post.kind in CLOSABLE_KINDS and post.author_id == viewer,
         )
         for post, author, community, likes, liked, saved in db.execute(query)
     ]
@@ -185,7 +188,8 @@ def create_community(data: CommunityCreate, db: DB, request: Request):
 
 @router.get("/feed", response_model=list[PostView])
 def feed(db: DB, user: Member, following: bool = False, community_id: UUID | None = None, author: Slug | None = None,
-         content: Literal["articles", "images", "collaboration", "reading"] | None = None,
+         content: Literal["articles", "images", "collaboration", "reading", "opportunities"] | None = None,
+         opportunity_kind: OpportunityKind | None = None, open_only: bool = False,
          q: str = Query(default="", max_length=100, pattern=r"^[^\x00]*$"),
          order: Literal["recent", "popular"] = "recent",
          offset: int = Query(default=0, ge=0, le=100_000),
@@ -200,9 +204,18 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
         get_community(community_id, db)
         conditions.append(Discussion.community_id == community_id)
     if content == "articles":
-        conditions.append(Discussion.article_url != "")
+        conditions.extend((Discussion.article_url != "", Discussion.kind.not_in(OPPORTUNITY_KINDS)))
     elif content == "images":
         conditions.append(Discussion.image != "")
+    elif content == "opportunities":
+        conditions.append(Discussion.kind.in_(OPPORTUNITY_KINDS))
+        if opportunity_kind:
+            conditions.append(Discussion.kind == opportunity_kind)
+        if open_only:
+            conditions.extend((
+                Discussion.resolved.is_(False),
+                or_(Discussion.scheduled_date.is_(None), Discussion.scheduled_date >= now().date()),
+            ))
     elif content:
         conditions.append(Discussion.kind == content)
     term = q.strip()
@@ -218,10 +231,15 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
 @router.post("/feed", status_code=201, response_model=PostView, dependencies=same_origin)
 def publish(data: PostInput, db: DB, request: Request):
     author = public_author(db, request)
-    if data.kind != "post" and (data.community_id is None or not data.title):
+    if data.kind in ("collaboration", "reading") and (data.community_id is None or not data.title):
         raise HTTPException(422, "Indique um título e publique a actividade numa comunidade.")
     if data.kind == "reading" and data.scheduled_date is None:
         raise HTTPException(422, "Indique a data da sessão de leitura.")
+    if data.kind in OPPORTUNITY_KINDS:
+        if not data.title or not data.article_url:
+            raise HTTPException(422, "Indique o título e a ligação para a candidatura ou submissão.")
+        if data.scheduled_date is not None and data.scheduled_date < now().date():
+            raise HTTPException(422, "O prazo da oportunidade já terminou.")
     if data.kind == "post" and (data.title or data.scheduled_date):
         raise HTTPException(422, "O título e a data destinam-se às actividades da comunidade.")
     if data.community_id is not None:
@@ -248,12 +266,12 @@ def topic(post_id: UUID, db: DB, user: Member):
 
 
 @router.put("/feed/{post_id}/resolved", response_model=PostView, dependencies=same_origin)
-def resolve_collaboration(post_id: UUID, db: DB, user: Member):
+def resolve_topic(post_id: UUID, db: DB, user: Member):
     topic = visible_topic(db, post_id, user.id)
-    if topic.kind != "collaboration":
-        raise HTTPException(404, "Pedido de colaboração indisponível.")
+    if topic.kind not in CLOSABLE_KINDS:
+        raise HTTPException(404, "Publicação indisponível para encerrar.")
     if not topic.can_resolve:
-        raise HTTPException(403, "Só o autor pode marcar este pedido como resolvido.")
+        raise HTTPException(403, "Só o autor pode encerrar esta publicação.")
     db.execute(update(Discussion).where(Discussion.id == post_id).values(resolved=True))
     db.commit()
     return visible_topic(db, post_id, user.id)

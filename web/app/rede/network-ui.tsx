@@ -9,7 +9,22 @@ import { readImage } from "../media";
 import FollowButton from "../u/[slug]/follow-button";
 import ReadingParticipants from "./reading-participants";
 
-type PostKind = "post" | "collaboration" | "reading";
+const opportunityLabels = {
+  scholarship: "Bolsa",
+  internship: "Estágio",
+  vacancy: "Vaga",
+  call: "Chamada para artigos",
+} as const;
+type OpportunityKind = keyof typeof opportunityLabels;
+type PostKind = "post" | "collaboration" | "reading" | OpportunityKind;
+
+function isOpportunity(kind: PostKind): kind is OpportunityKind {
+  return Object.hasOwn(opportunityLabels, kind);
+}
+
+function OpportunityCategories() {
+  return Object.entries(opportunityLabels).map(([value, text]) => <option key={value} value={value}>{text}</option>);
+}
 type Post = {
   id: string;
   body: string;
@@ -71,14 +86,14 @@ const activityFilters = [
   { id: "reading", label: "Clube de leitura", icon: BookOpen },
 ] as const;
 
-function Composer({ endpoint, label, communityId, onSaved }: {
-  endpoint: string; label: string; communityId?: string; onSaved: (kind: PostKind) => void;
+function Composer({ endpoint, label, communityId, opportunities, onSaved }: {
+  endpoint: string; label: string; communityId?: string; opportunities?: boolean; onSaved: (kind: PostKind) => void;
 }) {
   const canAttach = endpoint === "/feed";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [body, setBody] = useState("");
-  const [kind, setKind] = useState<PostKind>("post");
+  const [kind, setKind] = useState<PostKind>(opportunities ? "scholarship" : "post");
   const [image, setImage] = useState("");
   const [article, setArticle] = useState(false);
   const [emojiMenu, setEmojiMenu] = useState(false);
@@ -130,7 +145,7 @@ function Composer({ endpoint, label, communityId, onSaved }: {
       setImage("");
       setArticle(false);
       setEmojiMenu(false);
-      setKind("post");
+      setKind(opportunities ? "scholarship" : "post");
       form.reset();
       onSaved(kind);
     } catch (failure) {
@@ -141,26 +156,30 @@ function Composer({ endpoint, label, communityId, onSaved }: {
   }
 
   return <form className="panel form-stack network-composer" onSubmit={submit}>
-    {communityId && <label>Tipo de publicação
+    {(communityId || opportunities) && <label>{opportunities ? "Tipo de oportunidade" : "Tipo de publicação"}
       <select value={kind} disabled={busy} onChange={(event) => setKind(event.target.value as PostKind)}>
-        <option value="post">Publicação</option>
-        <option value="collaboration">Pedido de colaboração</option>
-        <option value="reading">Sessão do clube de leitura</option>
+        {opportunities ? <OpportunityCategories /> : <>
+          <option value="post">Publicação</option>
+          <option value="collaboration">Pedido de colaboração</option>
+          <option value="reading">Sessão do clube de leitura</option>
+        </>}
       </select>
     </label>}
-    {kind !== "post" && <label>{kind === "reading" ? "Título da leitura" : "Título do pedido"}
+    {kind !== "post" && <label>{kind === "reading" ? "Título da leitura" : opportunities ? "Título da oportunidade" : "Título do pedido"}
       <input name="title" maxLength={120} required />
     </label>}
     {kind !== "post" && <label>{kind === "reading" ? "Data da sessão" : "Prazo (opcional)"}
       <input name="scheduled_date" type="date" min="0001-01-01" max="9999-12-31" required={kind === "reading"} />
     </label>}
-    <label>{kind === "reading" ? "Plano da sessão" : kind === "collaboration" ? "Apoio necessário" : canAttach ? "Criar publicação" : label}
+    <label>{kind === "reading" ? "Plano da sessão" : kind === "collaboration" ? "Apoio necessário" : opportunities ? "Descrição da oportunidade" : canAttach ? "Criar publicação" : label}
       <textarea ref={input} name="body" rows={3} maxLength={2400} value={body}
         onChange={(event) => setBody(event.target.value)}
-        placeholder={canAttach ? "Partilhe um resultado, uma pergunta ou uma proposta de colaboração." : undefined} required />
+        placeholder={opportunities ? "Indique a instituição, o local e os requisitos." : canAttach ? "Partilhe um resultado, uma pergunta ou uma proposta de colaboração." : undefined} required />
     </label>
     <small>Use @ seguido do endereço público do perfil para mencionar alguém.</small>
-    {article && <label>Ligação para um artigo<input name="article_url" type="url" maxLength={1000} /></label>}
+    {(article || opportunities) && <label>{opportunities ? "Ligação para candidatura ou submissão" : "Ligação para um artigo"}
+      <input name="article_url" type="url" maxLength={1000} required={opportunities} />
+    </label>}
     {image && <div className="composer-preview"><img src={image} alt="Pré-visualização da imagem" />
       <button type="button" className="secondary" onClick={() => setImage("")}>Remover imagem</button></div>}
     <div className="composer-tools">
@@ -171,8 +190,8 @@ function Composer({ endpoint, label, communityId, onSaved }: {
           <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy}
             onChange={(event) => { void attach(event.target.files?.[0]); event.target.value = ""; }} />
         </label>
-        <button className="secondary icon-action" type="button" aria-expanded={article}
-          onClick={() => setArticle(!article)}><LinkIcon size={18} aria-hidden="true" /> Artigo</button>
+        {!opportunities && <button className="secondary icon-action" type="button" aria-expanded={article}
+          onClick={() => setArticle(!article)}><LinkIcon size={18} aria-hidden="true" /> Artigo</button>}
       </>}
       <button className="primary" disabled={busy}>{label}</button>
     </div>
@@ -287,7 +306,8 @@ function PostCard({ post, topic, onChange }: { post: Post; topic?: boolean; onCh
     </header>
     {post.community_id && <Link href={`/comunidades/${post.community_id}`}>{post.community_name}</Link>}
     {post.kind !== "post" && post.title && <div className="post-activity">
-      <p className="muted">{post.kind === "reading" ? "Clube de leitura" : post.resolved ? "Colaboração resolvida" : "Pedido de colaboração em aberto"}</p>
+      <p className="muted">{isOpportunity(post.kind) ? `${opportunityLabels[post.kind]}${post.resolved ? " · Encerrada" : ""}` :
+        post.kind === "reading" ? "Clube de leitura" : post.resolved ? "Colaboração resolvida" : "Pedido de colaboração em aberto"}</p>
       <h2><Link href={`/rede/${post.id}`}>{post.title}</Link></h2>
       {post.scheduled_date && <time dateTime={post.scheduled_date}>
         {post.kind === "reading" ? "Sessão a " : "Prazo até "}
@@ -297,7 +317,7 @@ function PostCard({ post, topic, onChange }: { post: Post; topic?: boolean; onCh
     <p className="biography">{post.body}</p>
     {post.image && <img className="post-image" src={post.image} alt="Imagem anexada à publicação" loading="lazy" />}
     {post.article_url && <a className="icon-action" href={post.article_url} rel="noopener noreferrer" target="_blank">
-      <LinkIcon size={17} aria-hidden="true" /> Abrir artigo
+      <LinkIcon size={17} aria-hidden="true" /> {isOpportunity(post.kind) ? "Consultar anúncio" : "Abrir artigo"}
     </a>}
     {topic && <PostActions post={post} onChange={onChange} />}
   </article>;
@@ -322,7 +342,7 @@ type PostFilter = AttachmentFilter | (typeof activityFilters)[number]["id"];
 
 function filterPosts(posts: Post[] | undefined, filter: AttachmentFilter) {
   if (filter === "all") return posts;
-  return posts?.filter((post) => filter === "articles" ? post.article_url : post.image);
+  return posts?.filter((post) => filter === "articles" ? post.article_url && !isOpportunity(post.kind) : post.image);
 }
 
 const savedFilters = [{ id: "all", label: "Todas", icon: Bookmark }, ...attachmentFilters] as const;
@@ -369,7 +389,7 @@ export function SavedPosts() {
                     </div>
                     <p className="biography">{post.body}</p>
                     {post.article_url && <a className="icon-action" href={post.article_url} target="_blank" rel="noopener noreferrer">
-                      <LinkIcon size={16} aria-hidden="true" /> Abrir artigo
+                      <LinkIcon size={16} aria-hidden="true" /> {isOpportunity(post.kind) ? "Consultar anúncio" : "Abrir artigo"}
                     </a>}
                   </div>
                 </div>
@@ -404,7 +424,9 @@ export function CommunityHighlights() {
 
 const feedPageSize = 20;
 
-export function Feed({ communityId }: { communityId?: string }) {
+export function Feed({ communityId, opportunities }: { communityId?: string; opportunities?: boolean }) {
+  const [category, setCategory] = useState("");
+  const [openOnly, setOpenOnly] = useState(true);
   const [following, setFollowing] = useState(false);
   const [filter, setFilter] = useState<PostFilter>("all");
   const [query, setQuery] = useState("");
@@ -414,7 +436,11 @@ export function Feed({ communityId }: { communityId?: string }) {
   const params = new URLSearchParams({ order, offset: String(page * feedPageSize), page_size: String(feedPageSize + 1) });
   if (communityId) params.set("community_id", communityId);
   else if (following) params.set("following", "true");
-  if (filter !== "all") params.set("content", filter);
+  if (opportunities) {
+    params.set("content", "opportunities");
+    if (category) params.set("opportunity_kind", category);
+    if (openOnly) params.set("open_only", "true");
+  } else if (filter !== "all") params.set("content", filter);
   if (query) params.set("q", query);
   const { data, error, refresh } = useNetworkData<Post[]>(`/feed?${params}`);
 
@@ -425,13 +451,14 @@ export function Feed({ communityId }: { communityId?: string }) {
   }
 
   return <div className="network-stack">
-    <Composer endpoint="/feed" communityId={communityId} label="Publicar" onSaved={(kind) => {
+    <Composer endpoint="/feed" communityId={communityId} opportunities={opportunities} label={opportunities ? "Publicar oportunidade" : "Publicar"} onSaved={(kind) => {
       setFollowing(false);
       setQuery("");
       setDraft("");
       setOrder("recent");
       setPage(0);
-      setFilter(kind === "post" ? "all" : kind);
+      setFilter(kind === "collaboration" || kind === "reading" ? kind : "all");
+      setCategory("");
       refresh();
     }} />
     <form className="panel feed-search-tools" onSubmit={search} role="search" aria-label="Pesquisar publicações">
@@ -454,24 +481,34 @@ export function Feed({ communityId }: { communityId?: string }) {
       <span>Resultados para «{query}»</span>
       <button className="secondary" type="button" onClick={() => { setQuery(""); setDraft(""); setPage(0); }}>Limpar pesquisa</button>
     </div>}
-    {!communityId && <div className="feed-filters" role="group" aria-label="Filtrar publicações">
+    {opportunities && <div className="panel opportunity-filters">
+      <label>Categoria
+        <select value={category} onChange={(event) => { setCategory(event.target.value); setPage(0); }}>
+          <option value="">Todas as categorias</option>
+          <OpportunityCategories />
+        </select>
+      </label>
+      <label className="check"><input type="checkbox" checked={openOnly}
+        onChange={(event) => { setOpenOnly(event.target.checked); setPage(0); }} />Só oportunidades em aberto</label>
+    </div>}
+    {!opportunities && !communityId && <div className="feed-filters" role="group" aria-label="Filtrar publicações">
       <button className="secondary" aria-pressed={!following} onClick={() => { setFollowing(false); setPage(0); }}>Todas as pessoas</button>
       <button className="secondary" aria-pressed={following} onClick={() => { setFollowing(true); setPage(0); }}>Pessoas que sigo</button>
     </div>}
-    <div className="feed-filters feed-content-filters" role="group" aria-label="Filtrar por tipo de publicação">
+    {!opportunities && <div className="feed-filters feed-content-filters" role="group" aria-label="Filtrar por tipo de publicação">
       <button className="secondary" type="button" aria-pressed={filter === "all"}
         onClick={() => { setFilter("all"); setPage(0); }}>Todas</button>
       {[...attachmentFilters, ...activityFilters].map(({ id, label, icon: Icon }) => (
         <button className="secondary icon-action" key={id} type="button" aria-pressed={filter === id}
           onClick={() => { setFilter(id); setPage(0); }}><Icon size={16} aria-hidden="true" />{label}</button>
       ))}
-    </div>
+    </div>}
     {communityId && !query && page === 0 && filter === "all" && data?.length === 0 ? <div className="panel community-empty" role="status">
       <MessageSquare size={25} aria-hidden="true" />
       <strong>Ainda não há debates nesta comunidade.</strong>
       <p>Publique uma pergunta, um resultado ou uma proposta de colaboração.</p>
     </div> : <Posts data={data?.slice(0, feedPageSize)} error={error}
-      empty={query ? "Nenhuma publicação corresponde à pesquisa." : "Nenhuma publicação nesta página."} topic />}
+      empty={query ? "Nenhuma publicação corresponde à pesquisa." : opportunities ? "Nenhuma oportunidade nestes filtros." : "Nenhuma publicação nesta página."} topic />}
     {(page > 0 || (data?.length ?? 0) > feedPageSize) && (
       <nav className="feed-filters" aria-label="Páginas de publicações">
         <button className="secondary" type="button" disabled={page === 0}
@@ -508,7 +545,7 @@ export function Topic({ id }: { id: string }) {
   return <div className="network-stack">
     <PostCard post={topic.data} topic />
     {topic.data.can_resolve && !topic.data.resolved &&
-      <button className="secondary" type="button" disabled={resolving} onClick={() => void resolve()}>Marcar como resolvido</button>}
+      <button className="secondary" type="button" disabled={resolving} onClick={() => void resolve()}>{isOpportunity(topic.data.kind) ? "Encerrar oportunidade" : "Marcar como resolvido"}</button>}
     {resolveError && <p className="notice error" role="alert">{resolveError}</p>}
     {topic.data.kind === "reading" && <ReadingParticipants postId={id} />}
     <h2 id="comentarios">Comentários</h2>

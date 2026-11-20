@@ -1,4 +1,4 @@
-import { Bookmark, House, Settings, UserRound, Users } from "lucide-react";
+import { Bookmark, BriefcaseBusiness, House, Settings, UserRound, Users } from "lucide-react";
 import Link from "next/link";
 import FeedProfileCard from "./feed-profile-card";
 
@@ -6,6 +6,7 @@ const shortcuts = [
   ["/rede", "Feed académico", House],
   ["/perfil", "Meu perfil", UserRound],
   ["/comunidades", "Comunidades", Users],
+  ["/oportunidades", "Oportunidades", BriefcaseBusiness],
   ["/guardados", "Guardados", Bookmark],
   ["/definicoes", "Definições", Settings],
 ] as const;
