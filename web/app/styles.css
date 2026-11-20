@@ -809,3 +809,12 @@ body:has(.account-split) .site-footer { margin-top: 0; }
 .community-highlight-link span:last-child { min-width: 0; }
 .community-photo-form { border-top: 1px solid var(--line); padding-top: .85rem; gap: .55rem; }
 .community-photo-form input[type="file"] { font-size: .82rem; }
+
+.feed-search-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(118px, auto); align-items: end; gap: .6rem; }
+.feed-search-tools select, .feed-search-tools input, .feed-search-tools button { min-height: 40px; }
+.feed-active-search, nav.feed-filters { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.feed-active-search { overflow-wrap: anywhere; }
+@media (max-width: 580px) {
+  .feed-search-tools { grid-template-columns: minmax(0, 1fr) auto; }
+  .feed-search-tools label:last-child { grid-column: 1 / -1; }
+}

@@ -3,9 +3,9 @@ from datetime import date
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import AfterValidator, BaseModel, Field, StringConstraints, field_validator
-from sqlalchemy import delete, false, func, select, update
+from sqlalchemy import delete, false, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
@@ -82,7 +82,9 @@ class PostView(BaseModel):
     can_resolve: bool = False
 
 
-def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40, viewer: UUID | None = None):
+def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
+               viewer: UUID | None = None, offset: int = 0, popular: bool = False):
+    date_order = Discussion.created_at.desc() if newest else Discussion.created_at
     likes = select(func.count()).select_from(Reaction).join(User).where(
         Reaction.post_id == Discussion.id, User.deactivated_at.is_(None),
     ).correlate(Discussion).scalar_subquery()
@@ -96,7 +98,8 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40, vi
         .join(User, User.id == Profile.user_id)
         .outerjoin(Community, Community.id == Discussion.community_id)
         .where(Profile.is_public.is_(True), User.deactivated_at.is_(None), *conditions)
-        .order_by(Discussion.created_at.desc() if newest else Discussion.created_at, Discussion.id)
+        .order_by(*([likes.desc()] if popular else []), date_order, Discussion.id)
+        .offset(offset)
         .limit(page_size)
     )
     return [
@@ -182,7 +185,11 @@ def create_community(data: CommunityCreate, db: DB, request: Request):
 
 @router.get("/feed", response_model=list[PostView])
 def feed(db: DB, user: Member, following: bool = False, community_id: UUID | None = None, author: Slug | None = None,
-         content: Literal["articles", "images", "collaboration", "reading"] | None = None):
+         content: Literal["articles", "images", "collaboration", "reading"] | None = None,
+         q: str = Query(default="", max_length=100, pattern=r"^[^\x00]*$"),
+         order: Literal["recent", "popular"] = "recent",
+         offset: int = Query(default=0, ge=0, le=100_000),
+         page_size: int = Query(default=40, ge=1, le=40)):
     conditions = [Discussion.parent_id.is_(None)]
     viewer = user.id
     if following:
@@ -198,7 +205,14 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
         conditions.append(Discussion.image != "")
     elif content:
         conditions.append(Discussion.kind == content)
-    return read_posts(db, *conditions, viewer=viewer)
+    term = q.strip()
+    if term:
+        conditions.append(or_(
+            Discussion.title.icontains(term, autoescape=True),
+            Discussion.body.icontains(term, autoescape=True),
+        ))
+    return read_posts(db, *conditions, viewer=viewer, offset=offset, page_size=page_size,
+                      popular=order == "popular")
 
 
 @router.post("/feed", status_code=201, response_model=PostView, dependencies=same_origin)

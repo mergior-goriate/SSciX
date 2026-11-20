@@ -402,37 +402,85 @@ export function CommunityHighlights() {
   </section>;
 }
 
+const feedPageSize = 20;
+
 export function Feed({ communityId }: { communityId?: string }) {
   const [following, setFollowing] = useState(false);
   const [filter, setFilter] = useState<PostFilter>("all");
-  const basePath = communityId ? `/feed?community_id=${communityId}` : `/feed?following=${following}`;
-  const path = filter === "all" ? basePath : `${basePath}&content=${filter}`;
-  const { data, error, refresh } = useNetworkData<Post[]>(path);
+  const [query, setQuery] = useState("");
+  const [draft, setDraft] = useState("");
+  const [order, setOrder] = useState<"recent" | "popular">("recent");
+  const [page, setPage] = useState(0);
+  const params = new URLSearchParams({ order, offset: String(page * feedPageSize), page_size: String(feedPageSize + 1) });
+  if (communityId) params.set("community_id", communityId);
+  else if (following) params.set("following", "true");
+  if (filter !== "all") params.set("content", filter);
+  if (query) params.set("q", query);
+  const { data, error, refresh } = useNetworkData<Post[]>(`/feed?${params}`);
+
+  function search(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setQuery(draft.trim());
+    setPage(0);
+  }
 
   return <div className="network-stack">
     <Composer endpoint="/feed" communityId={communityId} label="Publicar" onSaved={(kind) => {
-      if (following) setFollowing(false);
+      setFollowing(false);
+      setQuery("");
+      setDraft("");
+      setOrder("recent");
+      setPage(0);
       setFilter(kind === "post" ? "all" : kind);
       refresh();
     }} />
+    <form className="panel feed-search-tools" onSubmit={search} role="search" aria-label="Pesquisar publicações">
+      <label>Pesquisar publicações
+        <input type="search" maxLength={100} value={draft} onChange={(event) => setDraft(event.target.value)}
+          placeholder="Termo no título ou no texto" />
+      </label>
+      <button className="secondary" type="submit"><Search size={16} aria-hidden="true" />Pesquisar</button>
+      <label>Ordenar por
+        <select value={order} onChange={(event) => {
+          setOrder(event.target.value === "popular" ? "popular" : "recent");
+          setPage(0);
+        }}>
+          <option value="recent">Mais recentes</option>
+          <option value="popular">Mais gostos</option>
+        </select>
+      </label>
+    </form>
+    {query && <div className="feed-active-search">
+      <span>Resultados para «{query}»</span>
+      <button className="secondary" type="button" onClick={() => { setQuery(""); setDraft(""); setPage(0); }}>Limpar pesquisa</button>
+    </div>}
     {!communityId && <div className="feed-filters" role="group" aria-label="Filtrar publicações">
-      <button className="secondary" aria-pressed={!following} onClick={() => setFollowing(false)}>Publicações recentes</button>
-      <button className="secondary" aria-pressed={following} onClick={() => setFollowing(true)}>Pessoas que sigo</button>
+      <button className="secondary" aria-pressed={!following} onClick={() => { setFollowing(false); setPage(0); }}>Todas as pessoas</button>
+      <button className="secondary" aria-pressed={following} onClick={() => { setFollowing(true); setPage(0); }}>Pessoas que sigo</button>
     </div>}
     <div className="feed-filters feed-content-filters" role="group" aria-label="Filtrar por tipo de publicação">
       <button className="secondary" type="button" aria-pressed={filter === "all"}
-        onClick={() => setFilter("all")}>Todas</button>
+        onClick={() => { setFilter("all"); setPage(0); }}>Todas</button>
       {[...attachmentFilters, ...activityFilters].map(({ id, label, icon: Icon }) => (
         <button className="secondary icon-action" key={id} type="button" aria-pressed={filter === id}
-          onClick={() => setFilter(id)}><Icon size={16} aria-hidden="true" />{label}</button>
+          onClick={() => { setFilter(id); setPage(0); }}><Icon size={16} aria-hidden="true" />{label}</button>
       ))}
     </div>
-    {communityId && filter === "all" && data?.length === 0 ? <div className="panel community-empty" role="status">
+    {communityId && !query && page === 0 && filter === "all" && data?.length === 0 ? <div className="panel community-empty" role="status">
       <MessageSquare size={25} aria-hidden="true" />
       <strong>Ainda não há debates nesta comunidade.</strong>
       <p>Publique uma pergunta, um resultado ou uma proposta de colaboração.</p>
-    </div> : <Posts data={data} error={error}
-      empty={filter === "all" ? "Ainda não há publicações para mostrar." : "Nenhuma publicação neste filtro."} topic />}
+    </div> : <Posts data={data?.slice(0, feedPageSize)} error={error}
+      empty={query ? "Nenhuma publicação corresponde à pesquisa." : "Nenhuma publicação nesta página."} topic />}
+    {(page > 0 || (data?.length ?? 0) > feedPageSize) && (
+      <nav className="feed-filters" aria-label="Páginas de publicações">
+        <button className="secondary" type="button" disabled={page === 0}
+          onClick={() => setPage(page - 1)}>Anterior</button>
+        <span aria-live="polite">Página {page + 1}</span>
+        <button className="secondary" type="button" disabled={(data?.length ?? 0) <= feedPageSize || page >= 5000}
+          onClick={() => setPage(page + 1)}>Seguinte</button>
+      </nav>
+    )}
   </div>;
 }
 

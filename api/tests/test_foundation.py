@@ -251,6 +251,15 @@ def test_social_workflow_permissions(account, app_config):
             assert reader.get(post["image"]).headers["content-type"] == "image/png"
             assert reader.get(f"{root}/feed", params={"following": True}).json()[0]["id"] == post["id"]
             assert reader.put(post_url + "/actions/like").json()["likes"] == 1
+            newest = author.post(f"{root}/feed", json={"body": "Educação e biblioteca"}).json()
+            search = {"author": author_slug, "q": "EDUCAÇÃO", "page_size": 1}
+            assert reader.get(f"{root}/feed", params=search).json()[0]["id"] == newest["id"]
+            popular = {**search, "order": "popular"}
+            assert reader.get(f"{root}/feed", params=popular).json()[0]["id"] == post["id"]
+            assert reader.get(f"{root}/feed", params={**popular, "offset": 1}).json()[0]["id"] == newest["id"]
+            assert reader.get(f"{root}/feed", params={**search, "q": "%"}).json() == []
+            assert reader.get(f"{root}/feed", params={**search, "q": "biblioteca", "content": "articles"}).json() == []
+            assert reader.get(f"{root}/feed", params={"page_size": 41}).status_code == 422
             assert reader.put(post_url + "/actions/like").json()["likes"] == 1
             assert reader.put(post_url + "/actions/save").json()["saved"]
             assert reader.get(f"{root}/saved").json()[0]["id"] == post["id"]
@@ -272,6 +281,7 @@ def test_social_workflow_permissions(account, app_config):
 
             assert author.put(f"{root}/profiles/me", json={**author_profile, "is_public": False}).status_code == 200
             assert reader.get(post_url).status_code == 404
+            assert reader.get(f"{root}/feed", params=search).json() == []
             assert reader.get(post["image"]).status_code == 404
             assert reader.get(public["photo"]).status_code == 404
             assert reader.get(f"{root}/saved").json() == []
