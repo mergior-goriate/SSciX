@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -104,7 +104,19 @@ class Discussion(Base):
     article_url: Mapped[str] = mapped_column(String(1000), server_default="")
     parent_id: Mapped[UUID | None] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"), index=True)
     body: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(String(16), server_default="post")
+    title: Mapped[str] = mapped_column(String(120), server_default="")
+    scheduled_date: Mapped[date | None] = mapped_column(Date)
+    resolved: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class ReadingParticipant(Base):
+    __tablename__ = "reading_participants"
+
+    post_id: Mapped[UUID] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    whatsapp: Mapped[str] = mapped_column(String(15), server_default="")
 
 
 class Reaction(Base):

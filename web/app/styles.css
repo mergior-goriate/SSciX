@@ -230,6 +230,11 @@ body:has(.feed-shell) .site-footer { display: none; }
 .feed-initials { flex: 0 0 auto; display: grid; place-items: center; border-radius: .65rem; width: 2.4rem; height: 2.4rem; background: var(--brand-wash); color: var(--brand-deep); font-weight: 750; }
 .feed-filters { display: flex; flex-wrap: wrap; gap: .55rem; }
 .feed-filters .secondary { border-radius: 2rem; min-height: 36px; padding: .32em .85em; font-size: .87rem; }
+.feed-content-filters .secondary[aria-pressed="true"] {
+  background: var(--brand-wash);
+  color: var(--brand);
+  border-color: currentColor;
+}
 .scholar-header { padding: 0; overflow: clip; }
 .scholar-cover {
   min-height: clamp(90px, 18vw, 200px);
@@ -716,6 +721,43 @@ body:has(.account-split) .site-footer { margin-top: 0; }
 .community-dialog header h2 { margin: 0; }
 .community-dialog header button { padding: .45rem; min-width: 44px; }
 .community-dialog .form-stack { margin-top: .8rem; }
+
+.post-activity { margin-block-start: .8rem; }
+.post-activity h2, .reading-participation h2 { margin: 0; }
+.post-activity time { display: block; margin-block-start: .25rem; }
+.reading-contacts { list-style: none; margin: 0; padding: 0; }
+.reading-contacts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding-block: .5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .feed-content-filters button, .post-actions button, .post-actions a, .community-list a {
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+
+  .post-actions button[data-confirmed] svg {
+    animation: post-action-confirmed 200ms ease-out;
+  }
+
+  .community-dialog[open] {
+    animation: community-dialog-enter 170ms ease-out;
+  }
+
+  @keyframes post-action-confirmed {
+    50% { transform: scale(1.22); }
+  }
+
+  @keyframes community-dialog-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
 
 @media (max-width: 720px) {
   .community-directory { grid-template-columns: minmax(0, 1fr); }

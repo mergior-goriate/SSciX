@@ -7,7 +7,9 @@ import { ArrowLeft, ArrowRight, FileText, Image as ImageIcon, LockKeyhole, Messa
 import Avatar from "../avatar";
 import { readImage } from "../media";
 import FollowButton from "../u/[slug]/follow-button";
+import ReadingParticipants from "./reading-participants";
 
+type PostKind = "post" | "collaboration" | "reading";
 type Post = {
   id: string;
   body: string;
@@ -22,6 +24,11 @@ type Post = {
   created_at: string;
   community_name: string | null;
   community_id: string | null;
+  kind: PostKind;
+  title: string;
+  scheduled_date: string | null;
+  resolved: boolean;
+  can_resolve: boolean;
 };
 type Community = { id: string; name: string; description: string; photo: string; can_edit_photo: boolean };
 
@@ -59,14 +66,19 @@ export function useNetworkData<T>(path: string, revision = 0) {
 }
 
 const emojis = ["😊", "👏", "💡", "🔬", "📚", "✅", "🤝", "🎓"];
+const activityFilters = [
+  { id: "collaboration", label: "Colaboração", icon: Users },
+  { id: "reading", label: "Clube de leitura", icon: BookOpen },
+] as const;
 
 function Composer({ endpoint, label, communityId, onSaved }: {
-  endpoint: string; label: string; communityId?: string; onSaved: () => void;
+  endpoint: string; label: string; communityId?: string; onSaved: (kind: PostKind) => void;
 }) {
   const canAttach = endpoint === "/feed";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [body, setBody] = useState("");
+  const [kind, setKind] = useState<PostKind>("post");
   const [image, setImage] = useState("");
   const [article, setArticle] = useState(false);
   const [emojiMenu, setEmojiMenu] = useState(false);
@@ -103,19 +115,24 @@ function Composer({ endpoint, label, communityId, onSaved }: {
     event.preventDefault();
     if (busy || !body.trim()) return;
     const form = event.currentTarget;
-    const articleUrl = String(new FormData(form).get("article_url") ?? "");
+    const fields = new FormData(form);
     setBusy(true);
     setError("");
     try {
       await api(endpoint, "POST", {
-        body: body.trim(), ...(canAttach ? { image, article_url: articleUrl, community_id: communityId } : {}),
+        body: body.trim(),
+        ...(canAttach ? {
+          image, article_url: String(fields.get("article_url") ?? ""), community_id: communityId,
+          kind, title: String(fields.get("title") ?? ""), scheduled_date: fields.get("scheduled_date") || null,
+        } : {}),
       });
       setBody("");
       setImage("");
       setArticle(false);
       setEmojiMenu(false);
+      setKind("post");
       form.reset();
-      onSaved();
+      onSaved(kind);
     } catch (failure) {
       setError(message(failure));
     } finally {
@@ -124,7 +141,20 @@ function Composer({ endpoint, label, communityId, onSaved }: {
   }
 
   return <form className="panel form-stack network-composer" onSubmit={submit}>
-    <label>{canAttach ? "Criar publicação" : label}
+    {communityId && <label>Tipo de publicação
+      <select value={kind} disabled={busy} onChange={(event) => setKind(event.target.value as PostKind)}>
+        <option value="post">Publicação</option>
+        <option value="collaboration">Pedido de colaboração</option>
+        <option value="reading">Sessão do clube de leitura</option>
+      </select>
+    </label>}
+    {kind !== "post" && <label>{kind === "reading" ? "Título da leitura" : "Título do pedido"}
+      <input name="title" maxLength={120} required />
+    </label>}
+    {kind !== "post" && <label>{kind === "reading" ? "Data da sessão" : "Prazo (opcional)"}
+      <input name="scheduled_date" type="date" min="0001-01-01" max="9999-12-31" required={kind === "reading"} />
+    </label>}
+    <label>{kind === "reading" ? "Plano da sessão" : kind === "collaboration" ? "Apoio necessário" : canAttach ? "Criar publicação" : label}
       <textarea ref={input} name="body" rows={3} maxLength={2400} value={body}
         onChange={(event) => setBody(event.target.value)}
         placeholder={canAttach ? "Partilhe um resultado, uma pergunta ou uma proposta de colaboração." : undefined} required />
@@ -200,12 +230,15 @@ function PostActions({ post, onChange }: { post: Post; onChange?: () => void }) 
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [shareUrl, setShareUrl] = useState("");
+  const [animatedAction, setAnimatedAction] = useState<"like" | "save">();
 
   async function toggle(action: "like" | "save", value: boolean) {
     setBusy(true);
     setFeedback("");
+    setAnimatedAction(undefined);
     try {
       setActions(await api<Actions>(`${path}/${action}`, value ? "DELETE" : "PUT"));
+      setAnimatedAction(action);
       if (action === "save" && value) onChange?.();
     } catch (failure) {
       setFeedback(message(failure));
@@ -227,12 +260,14 @@ function PostActions({ post, onChange }: { post: Post; onChange?: () => void }) 
 
   return <>
     <div className="post-actions">
-      <button type="button" aria-pressed={actions.liked} disabled={busy} onClick={() => void toggle("like", actions.liked)}>
+      <button type="button" aria-pressed={actions.liked} data-confirmed={animatedAction === "like" || undefined}
+        disabled={busy} onClick={() => void toggle("like", actions.liked)}>
         <Heart size={18} aria-hidden="true" /> Gostar <span aria-label={`${actions.likes} gostos`}>{actions.likes}</span>
       </button>
       <Link href={`/rede/${post.id}#comentarios`}><MessageCircle size={18} aria-hidden="true" /> Comentar</Link>
       <button type="button" onClick={() => void share()}><Forward size={18} aria-hidden="true" /> Partilhar</button>
-      <button type="button" aria-pressed={actions.saved} disabled={busy} onClick={() => void toggle("save", actions.saved)}>
+      <button type="button" aria-pressed={actions.saved} data-confirmed={animatedAction === "save" || undefined}
+        disabled={busy} onClick={() => void toggle("save", actions.saved)}>
         <Bookmark size={18} aria-hidden="true" /> {actions.saved ? (onChange ? "Remover dos guardados" : "Guardado") : "Guardar"}
       </button>
     </div>
@@ -251,6 +286,14 @@ function PostCard({ post, topic, onChange }: { post: Post; topic?: boolean; onCh
       <time className="muted" dateTime={post.created_at}>{post.created_at.slice(0, 10)}</time>
     </header>
     {post.community_id && <Link href={`/comunidades/${post.community_id}`}>{post.community_name}</Link>}
+    {post.kind !== "post" && post.title && <div className="post-activity">
+      <p className="muted">{post.kind === "reading" ? "Clube de leitura" : post.resolved ? "Colaboração resolvida" : "Pedido de colaboração em aberto"}</p>
+      <h2><Link href={`/rede/${post.id}`}>{post.title}</Link></h2>
+      {post.scheduled_date && <time dateTime={post.scheduled_date}>
+        {post.kind === "reading" ? "Sessão a " : "Prazo até "}
+        {post.scheduled_date.split("-").reverse().join("/")}
+      </time>}
+    </div>}
     <p className="biography">{post.body}</p>
     {post.image && <img className="post-image" src={post.image} alt="Imagem anexada à publicação" loading="lazy" />}
     {post.article_url && <a className="icon-action" href={post.article_url} rel="noopener noreferrer" target="_blank">
@@ -269,16 +312,25 @@ function Posts({ data, error, empty, topic, onChange }: {
   return data.map((post) => <PostCard key={post.id} post={post} topic={topic} onChange={onChange} />);
 }
 
-const savedFilters = [
-  { id: "all", label: "Todas", icon: Bookmark },
+const attachmentFilters = [
   { id: "articles", label: "Com artigo", icon: FileText },
   { id: "images", label: "Com imagem", icon: ImageIcon },
 ] as const;
 
+type AttachmentFilter = "all" | (typeof attachmentFilters)[number]["id"];
+type PostFilter = AttachmentFilter | (typeof activityFilters)[number]["id"];
+
+function filterPosts(posts: Post[] | undefined, filter: AttachmentFilter) {
+  if (filter === "all") return posts;
+  return posts?.filter((post) => filter === "articles" ? post.article_url : post.image);
+}
+
+const savedFilters = [{ id: "all", label: "Todas", icon: Bookmark }, ...attachmentFilters] as const;
+
 export function SavedPosts() {
   const { data, error, refresh } = useNetworkData<Post[]>("/saved");
-  const [filter, setFilter] = useState<(typeof savedFilters)[number]["id"]>("all");
-  const visible = data?.filter((post) => filter === "all" || (filter === "articles" ? post.article_url : post.image));
+  const [filter, setFilter] = useState<AttachmentFilter>("all");
+  const visible = filterPosts(data, filter);
 
   return <>
     <header className="information-hero">
@@ -352,34 +404,65 @@ export function CommunityHighlights() {
 
 export function Feed({ communityId }: { communityId?: string }) {
   const [following, setFollowing] = useState(false);
-  const path = communityId ? `/feed?community_id=${communityId}` : `/feed?following=${following}`;
+  const [filter, setFilter] = useState<PostFilter>("all");
+  const basePath = communityId ? `/feed?community_id=${communityId}` : `/feed?following=${following}`;
+  const path = filter === "all" ? basePath : `${basePath}&content=${filter}`;
   const { data, error, refresh } = useNetworkData<Post[]>(path);
 
   return <div className="network-stack">
-    <Composer endpoint="/feed" communityId={communityId} label="Publicar" onSaved={() => {
+    <Composer endpoint="/feed" communityId={communityId} label="Publicar" onSaved={(kind) => {
       if (following) setFollowing(false);
+      setFilter(kind === "post" ? "all" : kind);
       refresh();
     }} />
     {!communityId && <div className="feed-filters" role="group" aria-label="Filtrar publicações">
       <button className="secondary" aria-pressed={!following} onClick={() => setFollowing(false)}>Publicações recentes</button>
       <button className="secondary" aria-pressed={following} onClick={() => setFollowing(true)}>Pessoas que sigo</button>
     </div>}
-    {communityId && data?.length === 0 ? <div className="panel community-empty" role="status">
+    <div className="feed-filters feed-content-filters" role="group" aria-label="Filtrar por tipo de publicação">
+      <button className="secondary" type="button" aria-pressed={filter === "all"}
+        onClick={() => setFilter("all")}>Todas</button>
+      {[...attachmentFilters, ...activityFilters].map(({ id, label, icon: Icon }) => (
+        <button className="secondary icon-action" key={id} type="button" aria-pressed={filter === id}
+          onClick={() => setFilter(id)}><Icon size={16} aria-hidden="true" />{label}</button>
+      ))}
+    </div>
+    {communityId && filter === "all" && data?.length === 0 ? <div className="panel community-empty" role="status">
       <MessageSquare size={25} aria-hidden="true" />
       <strong>Ainda não há debates nesta comunidade.</strong>
       <p>Publique uma pergunta, um resultado ou uma proposta de colaboração.</p>
-    </div> : <Posts data={data} error={error} empty="Ainda não há publicações para mostrar." topic />}
+    </div> : <Posts data={data} error={error}
+      empty={filter === "all" ? "Ainda não há publicações para mostrar." : "Nenhuma publicação neste filtro."} topic />}
   </div>;
 }
 
 export function Topic({ id }: { id: string }) {
   const topic = useNetworkData<Post>(`/feed/${id}`);
   const replies = useNetworkData<Post[]>(`/feed/${id}/replies`);
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState("");
   if (topic.error) return <p role="alert">{topic.error}</p>;
   if (!topic.data) return <p role="status">A carregar o debate…</p>;
 
+  async function resolve() {
+    setResolving(true);
+    setResolveError("");
+    try {
+      await api(`/feed/${id}/resolved`, "PUT");
+      topic.refresh();
+    } catch (failure) {
+      setResolveError(message(failure));
+    } finally {
+      setResolving(false);
+    }
+  }
+
   return <div className="network-stack">
     <PostCard post={topic.data} topic />
+    {topic.data.can_resolve && !topic.data.resolved &&
+      <button className="secondary" type="button" disabled={resolving} onClick={() => void resolve()}>Marcar como resolvido</button>}
+    {resolveError && <p className="notice error" role="alert">{resolveError}</p>}
+    {topic.data.kind === "reading" && <ReadingParticipants postId={id} />}
     <h2 id="comentarios">Comentários</h2>
     <Posts data={replies.data} error={replies.error} empty="Ainda não há respostas." />
     <Composer endpoint={`/feed/${id}/replies`} label="Comentar" onSaved={replies.refresh} />

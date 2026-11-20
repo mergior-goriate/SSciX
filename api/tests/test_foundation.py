@@ -282,6 +282,73 @@ def test_social_workflow_permissions(account, app_config):
             db.execute(delete(User).where(User.email == reader_email))
 
 
+def test_community_collaboration_and_reading_contacts(account, app_config):
+    from app.db import SessionFactory
+    from app.models import User
+
+    author, author_data, mailbox = account
+    app, origin = app_config
+    root = "/api/v1"
+    reader_slug = "leitor-" + uuid4().hex[:12]
+    reader_email = f"{reader_slug}@example.com"
+
+    def sign_up(client, registration):
+        assert client.post(f"{root}/auth/register", json=registration).status_code == 202
+        assert client.post(f"{root}/auth/verify", json={
+            "token": mailbox["verify"], "password": registration["password"],
+        }).status_code == 204
+        profile = client.get(f"{root}/profiles/me").json()
+        profile.pop("email")
+        assert client.put(f"{root}/profiles/me", json={**profile, "is_public": True}).status_code == 200
+
+    try:
+        with TestClient(app, base_url=origin, headers={"Origin": origin}) as reader, \
+             TestClient(app, base_url=origin, headers={"Origin": origin}) as guest:
+            sign_up(author, author_data)
+            sign_up(reader, {**author_data, "slug": reader_slug, "email": reader_email})
+            community = author.post(f"{root}/communities", json={
+                "name": "Leitura " + uuid4().hex[:12], "description": "Clube de leitura e colaboração",
+            }).json()
+            payload = {"community_id": community["id"], "title": "Análise de dados", "body": "Procuro apoio."}
+            collaboration = author.post(f"{root}/feed", json={**payload, "kind": "collaboration"})
+            assert collaboration.status_code == 201
+            request_id = collaboration.json()["id"]
+            request_path = f"{root}/feed/{request_id}"
+            assert reader.post(request_path + "/replies", json={"body": "Posso ajudar."}).status_code == 201
+            notice = author.get(f"{root}/notifications").json()[0]
+            assert notice["topic_id"] == request_id and notice["collaboration_reply"]
+            assert reader.put(request_path + "/resolved").status_code == 403
+            assert author.put(request_path + "/resolved").json()["resolved"] is True
+            assert reader.get(request_path).json()["resolved"] is True
+
+            invalid_session = author.post(f"{root}/feed", json={**payload, "kind": "reading"})
+            assert invalid_session.status_code == 422
+            session = author.post(f"{root}/feed", json={
+                **payload, "kind": "reading", "title": "Leitura de sexta-feira", "scheduled_date": "2026-12-04",
+            })
+            assert session.status_code == 201
+            session_id = session.json()["id"]
+            params = {"content": "reading", "community_id": community["id"]}
+            assert [post["id"] for post in reader.get(f"{root}/feed", params=params).json()] == [session_id]
+            participants = f"{root}/feed/{session_id}/participants"
+            assert guest.get(participants).status_code == 401
+            assert author.put(participants + "/me", json={"whatsapp": "258840000000"}).status_code == 204
+            assert reader.get(participants).json() == {"joined": False, "whatsapp": "", "participants": []}
+            assert reader.put(participants + "/me", json={"whatsapp": "invalid"}).status_code == 422
+            assert reader.put(participants + "/me", json={}).status_code == 204
+            response = reader.get(participants)
+            assert "no-store" in response.headers["cache-control"]
+            assert response.json()["participants"][0]["whatsapp"] == "258840000000"
+            assert author.put(participants + "/me", json={}).status_code == 204
+            assert reader.get(participants).json()["participants"][0]["whatsapp"] == ""
+            assert reader.delete(participants + "/me").status_code == 204
+            assert reader.get(participants).json()["participants"] == []
+            assert author.get(participants).json()["participants"] == []
+    finally:
+        with SessionFactory.begin() as db:
+            db.execute(delete(User).where(User.email == reader_email))
+
+
 def test_account_settings_keep_email_until_confirmation(account):
     client, data, mailbox = account
     root = "/api/v1"

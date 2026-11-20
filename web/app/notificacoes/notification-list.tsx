@@ -8,6 +8,7 @@ import { useNetworkData } from "../rede/network-ui";
 
 type Notice = {
   id: string; topic_id: string; author_name: string; author_photo?: string; created_at: string; read: boolean;
+  collaboration_reply?: boolean;
 };
 
 export default function NotificationList({ onNavigate }: { onNavigate?: () => void }) {
@@ -49,7 +50,9 @@ export default function NotificationList({ onNavigate }: { onNavigate?: () => vo
                 <Avatar name={notice.author_name} photo={notice.author_photo} />
                 <div>
                   <Link href={`/rede/${notice.topic_id}`} onClick={onNavigate}>
-                    <strong>{notice.author_name}</strong> mencionou-o numa publicação ou comentário.
+                    <strong>{notice.author_name}</strong> {notice.collaboration_reply
+                      ? "respondeu ao seu pedido de colaboração."
+                      : "mencionou-o numa publicação ou comentário."}
                   </Link>
                   <time className="muted" dateTime={notice.created_at}>{notice.created_at.slice(0, 10)}</time>
                 </div>
