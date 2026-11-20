@@ -228,6 +228,20 @@ def test_social_workflow_permissions(account, app_config):
             author_profile["photo"] = png
             assert author.put(f"{root}/profiles/me", json=author_profile).status_code == 200
             assert guest.get(profile_url).status_code == 401
+            cover = f"{root}/profiles/me/cover"
+            member_cover = profile_url + "/cover"
+            assert author.get(cover).status_code == 404
+            assert guest.get(cover).status_code == 401
+            assert author.put(cover, json={"image": "imagem inválida"}).status_code == 422
+            assert author.put(cover, json={"image": png}, headers={"Origin": "http://other.example"}).status_code == 403
+            assert author.put(cover, json={"image": png}).status_code == 204
+            assert author.get(f"{root}/profiles/me").json()["has_cover"] is True
+            assert author.get(cover).headers["content-type"] == "image/png"
+            assert reader.get(member_cover).content == author.get(cover).content
+            assert guest.get(member_cover).status_code == 401
+            assert author.put(cover, json={"image": ""}).status_code == 204
+            assert reader.get(member_cover).status_code == 404
+            assert author.put(cover, json={"image": png}).status_code == 204
             public = reader.get(profile_url).json()
             assert public["social_links"] == []
             assert reader.get(public["photo"]).headers["content-type"] == "image/png"
@@ -301,6 +315,8 @@ def test_social_workflow_permissions(account, app_config):
             assert reader.get(f"{root}/feed", params=search).json() == []
             assert reader.get(post["image"]).status_code == 404
             assert reader.get(public["photo"]).status_code == 404
+            assert reader.get(member_cover).status_code == 404
+            assert author.get(cover).status_code == 200
             assert reader.get(f"{root}/saved").json() == []
             assert reader.get(f"{root}/notifications").json() == []
             assert reader.get(f"{root}/messages/{author_slug}").json()["messages"][0]["body"] == "Mensagem privada"

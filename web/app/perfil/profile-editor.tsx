@@ -9,6 +9,7 @@ import { details, type Profile, roles, type SocialLink, trajectory } from "../pr
 
 import KeywordPicker from "../keyword-picker";
 import { readImage } from "../media";
+import CoverEditor from "./cover-editor";
 import { PhotoEditor, SocialEditor } from "./profile-media";
 
 type MyProfile = Profile & { email: string };
@@ -76,7 +77,7 @@ export default function ProfileEditor() {
 
   return <>
     <header className="panel own-profile-header">
-      <div className="own-profile-cover" aria-hidden="true" />
+      <CoverEditor initial={profile.has_cover} />
       <div className="own-profile-identity">
         <PhotoEditor name={profile.name} photo={photo} change={(file) => void changePhoto(file)} />
         <div className="own-profile-details">

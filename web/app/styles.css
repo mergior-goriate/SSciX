@@ -822,3 +822,11 @@ body:has(.account-split) .site-footer { margin-top: 0; }
 .opportunity-filters { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem 1rem; padding: .85rem; }
 .opportunity-filters > label:first-child { flex: 1 1 11rem; }
 .opportunity-filters .check { margin-bottom: .55rem; }
+
+.own-profile-cover, .scholar-cover { position: relative; }
+.profile-cover-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.profile-cover-controls { position: absolute; inset: auto .75rem .75rem auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
+.profile-cover-controls .secondary { min-height: 36px; font-size: .85rem; padding: .35rem .65rem; }
+.cover-notice { margin: .5rem .75rem 0; }
+
+.own-profile-identity, .scholar-identity { position: relative; }

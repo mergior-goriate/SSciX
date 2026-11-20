@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .auth import DB, Member, get_user
 from .models import Follow, Profile, User
-from .schemas import KeywordsInput, MyProfile, ProfileData, Slug
+from .schemas import KeywordsInput, MyProfile, ProfileCoverInput, ProfileData, Slug
 from .security import require_origin
 
 router = APIRouter(prefix="/profiles", tags=["perfis"])
@@ -31,7 +31,7 @@ def update_profile(data: ProfileData, db: DB, request: Request):
     profile = db.get(Profile, user.id, with_for_update={"key_share": True})
     if profile.is_public and not data.is_public:
         db.execute(delete(Follow).where(Follow.followed_id == user.id))
-    for key, value in data.model_dump().items():
+    for key, value in data.model_dump(exclude={"has_cover"}).items():
         if key in {"education", "experience", "publications", "photo", "keywords", "social_links"} and key not in data.model_fields_set:
             continue
         setattr(profile, key, value)
@@ -41,6 +41,18 @@ def update_profile(data: ProfileData, db: DB, request: Request):
         db.rollback()
         raise HTTPException(409, "Este endereço de perfil já está em uso.") from None
     return own_profile(profile, user.email)
+
+
+@router.get("/me/cover")
+def own_cover(db: DB, user: Member):
+    return image_response(db.get(Profile, user.id).cover)
+
+
+@router.put("/me/cover", status_code=204, dependencies=[Depends(require_origin)])
+def update_cover(data: ProfileCoverInput, db: DB, request: Request):
+    user = get_user(db, request, for_update=True)
+    db.get(Profile, user.id).cover = data.image
+    db.commit()
 
 
 @router.put("/me/keywords", status_code=204, dependencies=[Depends(require_origin)])
@@ -139,6 +151,11 @@ def image_response(value: str):
 @router.get("/{slug}/photo")
 def photo(slug: Slug, db: DB):
     return image_response(find_public_profile(db, slug).photo)
+
+
+@router.get("/{slug}/cover")
+def public_cover(slug: Slug, db: DB):
+    return image_response(find_public_profile(db, slug).cover)
 
 
 @router.get("/me/counts")

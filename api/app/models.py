@@ -42,9 +42,14 @@ class Profile(Base):
     publications: Mapped[str] = mapped_column(Text, server_default="")
     orcid: Mapped[str] = mapped_column(String(19), default="")
     photo: Mapped[str] = mapped_column(Text, server_default="")
+    cover: Mapped[str] = mapped_column(Text, server_default="", deferred=True)
     keywords: Mapped[list[str]] = mapped_column(JSON, server_default="[]")
     social_links: Mapped[list[dict]] = mapped_column(JSON, server_default="[]")
     is_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
+
+    @property
+    def has_cover(self) -> bool:
+        return bool(self.cover)
 
 
 class Session(Base):

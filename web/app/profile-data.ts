@@ -26,6 +26,7 @@ export type Profile = {
   experience: string;
   publications: string;
   photo: string;
+  has_cover: boolean;
   keywords: string[];
   social_links: SocialLink[];
   is_public: boolean;

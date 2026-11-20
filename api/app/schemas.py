@@ -114,6 +114,7 @@ class ProfileData(KeywordsInput):
     publications: str = Field(default="", max_length=2000)
     orcid: str = Field(default="", pattern=r"^(?:[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X])?$")
     photo: str = Field(default="", max_length=360_000)
+    has_cover: bool = False
     social_links: list[SocialLink] = Field(default_factory=list, max_length=8)
     is_public: bool = False
 
@@ -144,3 +145,9 @@ class ChangePassword(DeleteAccount):
 
 class ChangeEmail(EmailInput):
     password: Annotated[str, StringConstraints(min_length=1, max_length=128)]
+
+
+class ProfileCoverInput(Input):
+    image: str = Field(max_length=682_700)
+
+    _image = field_validator("image")(image_data)

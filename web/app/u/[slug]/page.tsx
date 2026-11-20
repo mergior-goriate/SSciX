@@ -38,7 +38,9 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
         <NetworkSideNav />
         <div className="network-main profile-main">
           <article className="panel scholar-header">
-            <div className="scholar-cover" aria-hidden="true" />
+            <div className="scholar-cover" aria-hidden="true">
+              {profile.has_cover && <img className="profile-cover-image" src={`/api/v1/profiles/${profile.slug}/cover`} alt="" />}
+            </div>
             <div className="scholar-identity">
               <Avatar name={profile.name} photo={profile.photo} className="initials" />
               <div>
