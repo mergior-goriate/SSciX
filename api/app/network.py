@@ -1,5 +1,6 @@
 import re
-from datetime import date
+from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -94,7 +95,7 @@ def visible_content():
 
 
 def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
-               viewer: UUID | None = None, offset: int = 0, popular: bool = False):
+               viewer: UUID | None = None, offset: int = 0, popular: bool = False, by_deadline: bool = False):
     date_order = Discussion.created_at.desc() if newest else Discussion.created_at
     likes = select(func.count()).select_from(Reaction).join(User).where(
         Reaction.post_id == Discussion.id, User.deactivated_at.is_(None), User.suspended.is_(False),
@@ -109,7 +110,8 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
         .join(User, User.id == Profile.user_id)
         .outerjoin(Community, Community.id == Discussion.community_id)
         .where(Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False), *visible_content(), *conditions)
-        .order_by(*([likes.desc()] if popular else []), date_order, Discussion.id)
+        .order_by(*([likes.desc()] if popular else [Discussion.scheduled_date.asc().nulls_last()] if by_deadline else []),
+                  date_order, Discussion.id)
         .offset(offset)
         .limit(page_size)
     )
@@ -197,9 +199,10 @@ def create_community(data: CommunityCreate, db: DB, request: Request):
 @router.get("/feed", response_model=list[PostView])
 def feed(db: DB, user: Member, following: bool = False, community_id: UUID | None = None, author: Slug | None = None,
          content: Literal["articles", "images", "collaboration", "reading", "opportunities"] | None = None,
-         opportunity_kind: OpportunityKind | None = None, open_only: bool = False,
+         opportunity_kind: OpportunityKind | None = None, open_only: bool = False, saved_only: bool = False,
+         deadline_days: Literal["7", "30"] | None = None,
          q: str = Query(default="", max_length=100, pattern=r"^[^\x00]*$"),
-         order: Literal["recent", "popular"] = "recent",
+         order: Literal["recent", "popular", "deadline"] = "recent",
          offset: int = Query(default=0, ge=0, le=100_000),
          page_size: int = Query(default=40, ge=1, le=40)):
     conditions = [Discussion.parent_id.is_(None)]
@@ -219,10 +222,16 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
         conditions.append(Discussion.kind.in_(OPPORTUNITY_KINDS))
         if opportunity_kind:
             conditions.append(Discussion.kind == opportunity_kind)
-        if open_only:
+        if saved_only:
+            conditions.append(Discussion.id.in_(select(Bookmark.post_id).where(Bookmark.user_id == viewer)))
+        today = now().astimezone(ZoneInfo("Africa/Maputo")).date()
+        if deadline_days:
+            conditions.extend((Discussion.resolved.is_(False),
+                               Discussion.scheduled_date.between(today, today + timedelta(days=int(deadline_days)))))
+        elif open_only:
             conditions.extend((
                 Discussion.resolved.is_(False),
-                or_(Discussion.scheduled_date.is_(None), Discussion.scheduled_date >= now().date()),
+                or_(Discussion.scheduled_date.is_(None), Discussion.scheduled_date >= today),
             ))
     elif content:
         conditions.append(Discussion.kind == content)
@@ -233,7 +242,7 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
             Discussion.body.icontains(term, autoescape=True),
         ))
     return read_posts(db, *conditions, viewer=viewer, offset=offset, page_size=page_size,
-                      popular=order == "popular")
+                      popular=order == "popular", by_deadline=content == "opportunities" and order == "deadline")
 
 
 @router.post("/feed", status_code=201, response_model=PostView, dependencies=same_origin)
@@ -246,7 +255,7 @@ def publish(data: PostInput, db: DB, request: Request):
     if data.kind in OPPORTUNITY_KINDS:
         if not data.title or not data.article_url:
             raise HTTPException(422, "Indique o título e a ligação para a candidatura ou submissão.")
-        if data.scheduled_date is not None and data.scheduled_date < now().date():
+        if data.scheduled_date is not None and data.scheduled_date < now().astimezone(ZoneInfo("Africa/Maputo")).date():
             raise HTTPException(422, "O prazo da oportunidade já terminou.")
     if data.kind == "post" and (data.title or data.scheduled_date):
         raise HTTPException(422, "O título e a data destinam-se às actividades da comunidade.")

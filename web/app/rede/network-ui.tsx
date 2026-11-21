@@ -431,12 +431,14 @@ const feedPageSize = 20;
 
 export function Feed({ communityId, opportunities }: { communityId?: string; opportunities?: boolean }) {
   const [category, setCategory] = useState("");
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [deadline, setDeadline] = useState("");
   const [openOnly, setOpenOnly] = useState(true);
   const [following, setFollowing] = useState(false);
   const [filter, setFilter] = useState<PostFilter>("all");
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
-  const [order, setOrder] = useState<"recent" | "popular">("recent");
+  const [order, setOrder] = useState<"recent" | "popular" | "deadline">("recent");
   const [page, setPage] = useState(0);
   const params = new URLSearchParams({ order, offset: String(page * feedPageSize), page_size: String(feedPageSize + 1) });
   if (communityId) params.set("community_id", communityId);
@@ -445,6 +447,8 @@ export function Feed({ communityId, opportunities }: { communityId?: string; opp
     params.set("content", "opportunities");
     if (category) params.set("opportunity_kind", category);
     if (openOnly) params.set("open_only", "true");
+    if (savedOnly) params.set("saved_only", "true");
+    if (deadline) params.set("deadline_days", deadline);
   } else if (filter !== "all") params.set("content", filter);
   if (query) params.set("q", query);
   const { data, error, refresh } = useNetworkData<Post[]>(`/feed?${params}`);
@@ -464,6 +468,8 @@ export function Feed({ communityId, opportunities }: { communityId?: string; opp
       setPage(0);
       setFilter(kind === "collaboration" || kind === "reading" ? kind : "all");
       setCategory("");
+      setSavedOnly(false);
+      setDeadline("");
       refresh();
     }} />
     <form className="panel feed-search-tools" onSubmit={search} role="search" aria-label="Pesquisar publicações">
@@ -474,11 +480,13 @@ export function Feed({ communityId, opportunities }: { communityId?: string; opp
       <button className="secondary" type="submit"><Search size={16} aria-hidden="true" />Pesquisar</button>
       <label>Ordenar por
         <select value={order} onChange={(event) => {
-          setOrder(event.target.value === "popular" ? "popular" : "recent");
+          const value = event.target.value;
+          setOrder(value === "popular" || value === "deadline" ? value : "recent");
           setPage(0);
         }}>
           <option value="recent">Mais recentes</option>
           <option value="popular">Mais gostos</option>
+          {opportunities && <option value="deadline">Prazo mais próximo</option>}
         </select>
       </label>
     </form>
@@ -493,7 +501,16 @@ export function Feed({ communityId, opportunities }: { communityId?: string; opp
           <OpportunityCategories />
         </select>
       </label>
-      <label className="check"><input type="checkbox" checked={openOnly}
+      <label>Prazo de candidatura
+        <select value={deadline} onChange={(event) => { setDeadline(event.target.value); setPage(0); }}>
+          <option value="">Qualquer prazo</option>
+          <option value="7">Até 7 dias</option>
+          <option value="30">Até 30 dias</option>
+        </select>
+      </label>
+      <label className="check"><input type="checkbox" checked={savedOnly}
+        onChange={(event) => { setSavedOnly(event.target.checked); setPage(0); }} />Só as minhas guardadas</label>
+      <label className="check"><input type="checkbox" checked={openOnly || Boolean(deadline)} disabled={Boolean(deadline)}
         onChange={(event) => { setOpenOnly(event.target.checked); setPage(0); }} />Só oportunidades em aberto</label>
     </div>}
     {!opportunities && !communityId && <div className="feed-filters" role="group" aria-label="Filtrar publicações">
@@ -513,7 +530,7 @@ export function Feed({ communityId, opportunities }: { communityId?: string; opp
       <strong>Ainda não há debates nesta comunidade.</strong>
       <p>Publique uma pergunta, um resultado ou uma proposta de colaboração.</p>
     </div> : <Posts data={data?.slice(0, feedPageSize)} error={error}
-      empty={query ? "Nenhuma publicação corresponde à pesquisa." : opportunities ? "Nenhuma oportunidade nestes filtros." : "Nenhuma publicação nesta página."} topic />}
+      empty={query ? "Nenhuma publicação corresponde à pesquisa." : opportunities ? "Nenhuma oportunidade nestes filtros." : "Nenhuma publicação nesta página."} topic onChange={savedOnly ? refresh : undefined} />}
     {(page > 0 || (data?.length ?? 0) > feedPageSize) && (
       <nav className="feed-filters" aria-label="Páginas de publicações">
         <button className="secondary" type="button" disabled={page === 0}
