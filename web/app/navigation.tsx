@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, BriefcaseBusiness, CircleHelp, History, Home, Shield, LogOut, Menu, MessageSquare, Settings, UserRound } from "lucide-react";
+import { Bookmark, BriefcaseBusiness, CircleHelp, History, Home, Shield, LogOut, Menu, MessageSquare, Settings, UserRound, UsersRound } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { api, message } from "./api-client";
 import NotificationPopover from "./notificacoes/notification-popover";
@@ -11,6 +11,7 @@ const links = [
   ["/rede", "Início", Home],
   ["/mensagens", "Mensagens", MessageSquare],
   ["/perfil", "Perfil", UserRound],
+  ["/pessoas", "Networking", UsersRound],
 ] as const;
 
 export default function Navigation() {
@@ -45,8 +46,10 @@ export default function Navigation() {
       const active = pathname === href || pathname.startsWith(href + "/");
       return <Fragment key={href}>
         {href === "/mensagens" && <NotificationPopover />}
-        <Link href={href} aria-label={label} title={label} aria-current={active ? "page" : undefined}>
+        <Link href={href} aria-label={label} title={label} aria-current={active ? "page" : undefined}
+          className={href === "/pessoas" ? "navigation-networking" : undefined}>
           <Icon size={21} aria-hidden="true" />
+          {href === "/pessoas" && <span>{label}</span>}
         </Link>
       </Fragment>;
     })}
