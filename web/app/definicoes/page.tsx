@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowRight, ChevronDown, LockKeyhole, Settings2, UserRound } from "lucide-react";
+import { ArrowRight, ChevronDown, LockKeyhole, Palette, Settings2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
+import AppearanceSettings from "./appearance-settings";
 
 const settings = [
   ["Email", "/auth/email", "POST", "Enviar confirmação"],
@@ -16,6 +17,7 @@ const categories = [
   { id: "perfil", label: "Perfil académico", icon: UserRound },
   { id: "seguranca", label: "Acesso e segurança", icon: LockKeyhole },
   { id: "conta", label: "Gestão da conta", icon: Settings2 },
+  { id: "aparencia", label: "Aparência", icon: Palette },
 ] as const;
 
 export default function Page() {
@@ -78,7 +80,11 @@ export default function Page() {
             <ArrowRight size={19} aria-hidden="true" />
           </Link>
         </section>
-        {categories.slice(1).map(({ id, label }) => (
+        <section id="settings-aparencia" className="panel settings-content" hidden={category !== "aparencia"}>
+          <h2>Aparência</h2>
+          <AppearanceSettings />
+        </section>
+        {categories.filter(({ id }) => id === "seguranca" || id === "conta").map(({ id, label }) => (
           <section id={`settings-${id}`} className="panel settings-content" hidden={category !== id} key={id}>
             <h2>{label}</h2>
             {error ? <p role="alert">{error} <Link href="/entrar">Entrar</Link></p> : !email ?
