@@ -300,6 +300,12 @@ body:has(.feed-shell) .site-footer { display: none; }
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 44px; min-width: 44px; padding: .28rem .55rem; border-radius: 7px;
 }
+.main-navigation > .navigation-networking {
+  flex-direction: column;
+  gap: .15rem;
+  font-size: .72rem;
+  line-height: 1.1;
+}
 .main-navigation > a[aria-current="page"], .main-navigation > a:hover, .navigation-menu summary:hover {
   background: var(--brand-fill); text-decoration: none;
 }
