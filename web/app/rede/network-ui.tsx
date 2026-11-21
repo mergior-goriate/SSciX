@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
-import { ArrowLeft, ArrowRight, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, BookOpen, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, BookOpen, Paperclip, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
 import Avatar from "../avatar";
 import { readImage } from "../media";
 import FollowButton from "../u/[slug]/follow-button";
 import ReportButton from "../report-button";
-import { CommunityAccess, PublicationRevisions } from "../academic-ui";
+import { CommunityAccess, PublicationRevisions, StoryPanel } from "../academic-ui";
+import type { Profile } from "../profile-data";
 import { useNetworkData } from "../use-network-data";
 export { useNetworkData } from "../use-network-data";
 import ReadingParticipants from "./reading-participants";
@@ -71,8 +72,9 @@ const activityFilters = [
   { id: "reading", label: "Clube de leitura", icon: BookOpen },
 ] as const;
 
-function Composer({ endpoint, label, communityId, opportunities, onSaved }: {
-  endpoint: string; label: string; communityId?: string; opportunities?: boolean; onSaved: (kind: PostKind) => void;
+function Composer({ endpoint, label, communityId, opportunities, compact, profile, onSaved }: {
+  endpoint: string; label: string; communityId?: string; opportunities?: boolean; compact?: boolean;
+  profile?: Profile; onSaved: (kind: PostKind) => void;
 }) {
   const canAttach = endpoint === "/feed";
   const [busy, setBusy] = useState(false);
@@ -83,6 +85,14 @@ function Composer({ endpoint, label, communityId, opportunities, onSaved }: {
   const [article, setArticle] = useState(false);
   const [emojiMenu, setEmojiMenu] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const attachment = useRef<HTMLInputElement>(null);
+  const titleId = useId();
+
+  function openComposer() {
+    dialog.current?.showModal();
+    input.current?.focus();
+  }
 
   async function attach(file?: File) {
     if (!file) return;
@@ -132,6 +142,7 @@ function Composer({ endpoint, label, communityId, opportunities, onSaved }: {
       setEmojiMenu(false);
       setKind(opportunities ? "scholarship" : "post");
       form.reset();
+      dialog.current?.close();
       onSaved(kind);
     } catch (failure) {
       setError(message(failure));
@@ -140,7 +151,7 @@ function Composer({ endpoint, label, communityId, opportunities, onSaved }: {
     }
   }
 
-  return <form className="panel form-stack network-composer" onSubmit={submit}>
+  const form = <form className={compact ? "form-stack network-composer" : "panel form-stack network-composer"} onSubmit={submit}>
     {(communityId || opportunities) && <label>{opportunities ? "Tipo de oportunidade" : "Tipo de publicação"}
       <select value={kind} disabled={busy} onChange={(event) => setKind(event.target.value as PostKind)}>
         {opportunities ? <OpportunityCategories /> : <>
@@ -172,7 +183,7 @@ function Composer({ endpoint, label, communityId, opportunities, onSaved }: {
         onClick={() => setEmojiMenu(!emojiMenu)}><Smile size={18} aria-hidden="true" /> Emojis</button>
       {canAttach && <>
         <label className="secondary attachment-label"><ImagePlus size={18} aria-hidden="true" /> Imagem
-          <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy}
+          <input ref={attachment} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy}
             onChange={(event) => { void attach(event.target.files?.[0]); event.target.value = ""; }} />
         </label>
         {!opportunities && <button className="secondary icon-action" type="button" aria-expanded={article}
@@ -185,6 +196,35 @@ function Composer({ endpoint, label, communityId, opportunities, onSaved }: {
     </div>}
     {error && <p className="notice error" role="alert">{error}</p>}
   </form>;
+
+  if (!compact) return form;
+
+  const firstName = profile?.name.trim().split(/\s+/)[0];
+  return <>
+    <div className="panel feed-quick-entry">
+      <Avatar name={profile?.name || "Meu perfil"} photo={profile?.photo} />
+      <button className="feed-quick-prompt" aria-label="Criar publicação" type="button" onClick={openComposer}>
+        {firstName ? `O que queres partilhar, ${firstName}?` : "O que queres partilhar?"}
+      </button>
+      <button className="feed-quick-action" type="button" aria-label="Adicionar imagem à publicação" title="Adicionar imagem"
+        onClick={() => { openComposer(); attachment.current?.click(); }}>
+        <ImagePlus size={21} aria-hidden="true" />
+      </button>
+      <button className="feed-quick-action" type="button" aria-label="Adicionar ligação para um artigo" title="Adicionar artigo"
+        onClick={() => { setArticle(true); openComposer(); }}>
+        <Paperclip size={20} aria-hidden="true" />
+      </button>
+    </div>
+    <dialog className="panel community-dialog feed-dialog" ref={dialog} aria-labelledby={titleId}>
+      <header>
+        <h2 id={titleId}>Criar publicação</h2>
+        <button className="secondary" type="button" aria-label="Fechar" onClick={() => dialog.current?.close()}>
+          <X size={18} aria-hidden="true" />
+        </button>
+      </header>
+      {form}
+    </dialog>
+  </>;
 }
 
 type Person = { slug: string; name: string; photo: string };
@@ -414,6 +454,7 @@ export function CommunityHighlights() {
 const feedPageSize = 20;
 
 export function Feed({ communityId, opportunities, initialQuery = "" }: { communityId?: string; opportunities?: boolean; initialQuery?: string }) {
+  const mainFeed = !communityId && !opportunities;
   const [category, setCategory] = useState("");
   const [savedOnly, setSavedOnly] = useState(false);
   const [deadline, setDeadline] = useState("");
@@ -436,6 +477,7 @@ export function Feed({ communityId, opportunities, initialQuery = "" }: { commun
   } else if (filter !== "all") params.set("content", filter);
   if (query) params.set("q", query);
   const { data, error, refresh } = useNetworkData<Post[]>(`/feed?${params}`);
+  const { data: profile } = useNetworkData<Profile>(mainFeed ? "/profiles/me" : null);
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -446,7 +488,7 @@ export function Feed({ communityId, opportunities, initialQuery = "" }: { commun
   }
 
   return <div className="network-stack">
-    <Composer endpoint="/feed" communityId={communityId} opportunities={opportunities} label={opportunities ? "Publicar oportunidade" : "Publicar"} onSaved={(kind) => {
+    <Composer endpoint="/feed" communityId={communityId} opportunities={opportunities} compact={mainFeed} profile={profile} label={opportunities ? "Publicar oportunidade" : "Publicar"} onSaved={(kind) => {
       setFollowing(false);
       setQuery("");
       setDraft("");
@@ -458,6 +500,7 @@ export function Feed({ communityId, opportunities, initialQuery = "" }: { commun
       setDeadline("");
       refresh();
     }} />
+    {mainFeed && <StoryPanel profile={profile} />}
     <form className="panel feed-search-tools" onSubmit={search} role="search" aria-label="Pesquisar publicações">
       <label>Pesquisar publicações
         <input type="search" maxLength={100} value={draft} onChange={(event) => setDraft(event.target.value)}
