@@ -41,10 +41,17 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
   await page.getByLabel("Palavra-passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Confirmar email" }).click();
   await expect(page.getByRole("status")).toContainText("Email confirmado");
+  await expect(page.getByRole("heading", { name: "Acerca de ti" })).toBeVisible();
+  await page.getByRole("button", { name: "Saltar" }).click();
+  await page.getByRole("checkbox", { name: "Educação", exact: true }).check();
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Personaliza o teu feed" })).toBeVisible();
   await page.getByLabel("Pesquisar temas").fill("educacao");
   await page.getByRole("checkbox", { name: "Educação" }).check();
   await page.getByRole("button", { name: "Guardar e continuar" }).click();
   await expect(page.getByRole("heading", { name: "Informação académica" })).toBeVisible();
+  const preferences = await page.request.get(new URL("/api/v1/profiles/me/preferences", page.url()).href);
+  expect(await preferences.json()).toEqual({ gender: null, areas: ["Educação"], topics: ["Educação"] });
 
   async function signIn(secret: string) {
     await page.goto("/entrar");
@@ -59,12 +66,12 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     const route = new URL(`/u/${slug}`, page.url()).href;
     await visitor.goto(route);
     await expect(visitor).toHaveURL(/\/entrar$/);
-    await page.getByLabel("Instituição", { exact: true }).fill("Universidade de ensaio");
+    await page.locator("#informacao-academica").getByLabel("Instituição", { exact: true }).fill("Universidade de ensaio");
     await page.getByRole("checkbox", { name: /Tornar o perfil público/ }).check();
     await page.getByRole("button", { name: "Guardar perfil" }).click();
     await expect(page.getByText("Perfil guardado.")).toBeVisible();
     await page.reload();
-    await expect(page.getByLabel("Instituição", { exact: true })).toHaveValue("Universidade de ensaio");
+    await expect(page.locator("#informacao-academica").getByLabel("Instituição", { exact: true })).toHaveValue("Universidade de ensaio");
     for (const path of ["/rede", "/comunidades", "/mensagens", "/pessoas", "/notificacoes", "/perfil"]) {
       const response = await visitor.request.get(new URL(path, route).href, { maxRedirects: 0 });
       expect(response.status()).toBe(307);

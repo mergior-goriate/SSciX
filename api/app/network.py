@@ -15,7 +15,7 @@ from .auth import DB, Member, get_user
 from .models import Bookmark, Community, CommunityMember, Discussion, Follow, Mention, Profile, Reaction, ReadingParticipant, User
 from .profiles import image_response, photo_url
 from .schemas import Input, Name, Slug, image_data, web_url
-from .search import publication_search
+from .search import interest_order, publication_search
 from .security import limit, now, require_origin
 
 router = APIRouter(tags=["rede académica"])
@@ -218,7 +218,7 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
          opportunity_kind: OpportunityKind | None = None, open_only: bool = False, saved_only: bool = False,
          deadline_days: Literal["7", "30"] | None = None,
          q: str = Query(default="", max_length=100, pattern=r"^[^\x00]*$"),
-         order: Literal["recent", "popular", "deadline"] = "recent",
+         order: Literal["recent", "popular", "deadline", "interests"] = "recent",
          offset: int = Query(default=0, ge=0, le=100_000),
          page_size: int = Query(default=40, ge=1, le=40)):
     conditions = [Discussion.parent_id.is_(None)]
@@ -255,8 +255,11 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
     if term := q.strip():
         predicate, *ranking = publication_search(term)
         conditions.append(predicate)
-        if order == "recent":
+        if order in ("recent", "interests"):
             relevance = tuple(ranking)
+    elif order == "interests" and community_id is None and author is None and content != "opportunities":
+        preferences = db.get(Profile, viewer).preferences
+        relevance = interest_order(preferences.get("topics", []), preferences.get("areas", []))
     return read_posts(db, *conditions, viewer=viewer, offset=offset, page_size=page_size, relevance=relevance,
                       popular=order == "popular", by_deadline=content == "opportunities" and order == "deadline")
 

@@ -15,6 +15,7 @@ export default function Terms() {
     <InformationSection id="privacidade" title="Privacidade" icon={Shield}>
       <p>A SSciX guarda o email, as credenciais de acesso e os dados introduzidos no perfil. O email da conta permanece privado.</p>
       <p>Ao activar a visibilidade pública, autoriza a apresentação dos campos do perfil a membros da SSciX com sessão iniciada.</p>
+      <p>A identificação de género é opcional. Essa informação e os interesses usados para ordenar o feed são privados e podem ser alterados ou retirados em <Link href="/definicoes">Definições</Link>.</p>
       <p>Introduza apenas informações que pode partilhar. A afiliação, a função académica e o ORCID são declarados pelo titular.</p>
     </InformationSection>
     <InformationSection id="conta" title="Gestão da conta" icon={Settings}>

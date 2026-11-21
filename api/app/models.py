@@ -47,6 +47,7 @@ class Profile(Base):
     photo: Mapped[str] = mapped_column(Text, server_default="")
     cover: Mapped[str] = mapped_column(Text, server_default="", deferred=True)
     keywords: Mapped[list[str]] = mapped_column(JSON, server_default="[]")
+    preferences: Mapped[dict] = mapped_column(JSON, server_default="{}", deferred=True)
     social_links: Mapped[list[dict]] = mapped_column(JSON, server_default="[]")
     is_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
 

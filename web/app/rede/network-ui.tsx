@@ -463,7 +463,9 @@ export function Feed({ communityId, opportunities, initialQuery = "" }: { commun
   const [filter, setFilter] = useState<PostFilter>("all");
   const [query, setQuery] = useState(initialQuery);
   const [draft, setDraft] = useState(initialQuery);
-  const [order, setOrder] = useState<"recent" | "popular" | "deadline">("recent");
+  const [order, setOrder] = useState<"recent" | "popular" | "deadline" | "interests">(
+    mainFeed && !initialQuery ? "interests" : "recent",
+  );
   const [page, setPage] = useState(0);
   const params = new URLSearchParams({ order, offset: String(page * feedPageSize), page_size: String(feedPageSize + 1) });
   if (communityId) params.set("community_id", communityId);
@@ -510,9 +512,10 @@ export function Feed({ communityId, opportunities, initialQuery = "" }: { commun
       <label>Ordenar por
         <select value={order} onChange={(event) => {
           const value = event.target.value;
-          setOrder(value === "popular" || value === "deadline" ? value : "recent");
+          setOrder(value === "popular" || value === "deadline" || value === "interests" ? value : "recent");
           setPage(0);
         }}>
+          {mainFeed && <option value="interests">Para ti</option>}
           <option value="recent">Mais recentes</option>
           <option value="popular">Mais gostos</option>
           {opportunities && <option value="deadline">Prazo mais próximo</option>}
