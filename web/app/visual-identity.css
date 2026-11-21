@@ -51,8 +51,6 @@ body { min-height: 100dvh; background-image: linear-gradient(165deg, #e1eef860, 
 .settings-layout, .notification-workspace, .directory-workspace, .discussion-shell > .network-stack { margin-top: 1rem; }
 .discussion-shell { max-width: 840px; }
 .notification-workspace { max-width: 760px; }
-.onboarding-shell { max-width: 660px; }
-.onboarding-shell > .panel { border-top: 3px solid var(--brand); margin-top: 0; }
 
 .directory-workspace form { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
 .directory-workspace form label { grid-column: 1 / -1; }

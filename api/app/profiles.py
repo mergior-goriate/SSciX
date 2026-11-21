@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .auth import DB, Member, get_user
 from .models import Affiliation, Follow, Profile, User
-from .schemas import KeywordsInput, MyProfile, ProfileCoverInput, ProfileData, Slug
+from .schemas import KeywordsInput, MemberPreferences, MyProfile, ProfileCoverInput, ProfileData, Slug
 from .security import require_origin
 
 router = APIRouter(prefix="/profiles", tags=["perfis"])
@@ -59,6 +59,18 @@ def update_cover(data: ProfileCoverInput, db: DB, request: Request):
 def update_keywords(data: KeywordsInput, db: DB, request: Request):
     user = get_user(db, request, for_update=True)
     db.get(Profile, user.id).keywords = data.keywords
+    db.commit()
+
+
+@router.get("/me/preferences", response_model=MemberPreferences)
+def get_preferences(db: DB, user: Member):
+    return db.get(Profile, user.id).preferences
+
+
+@router.put("/me/preferences", status_code=204, dependencies=[Depends(require_origin)])
+def update_preferences(data: MemberPreferences, db: DB, request: Request):
+    user = get_user(db, request, for_update=True)
+    db.get(Profile, user.id).preferences = data.model_dump()
     db.commit()
 
 

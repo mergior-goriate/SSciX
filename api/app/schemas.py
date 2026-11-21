@@ -99,6 +99,20 @@ class KeywordsInput(Input):
         return list(dict.fromkeys(values))
 
 
+PreferenceTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60, pattern=r"^[^\x00]+$")]
+
+
+class MemberPreferences(Input):
+    gender: Literal["woman", "man", "nonbinary"] | None = None
+    areas: list[PreferenceTerm] = Field(default_factory=list, max_length=10)
+    topics: list[PreferenceTerm] = Field(default_factory=list, max_length=12)
+
+    @field_validator("areas", "topics")
+    @classmethod
+    def unique_terms(cls, values):
+        return list(dict.fromkeys(values))
+
+
 class ProfileData(KeywordsInput):
     name: Name
     slug: Slug

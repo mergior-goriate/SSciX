@@ -22,3 +22,14 @@ def publication_search(term: str):
     eligible = or_(matches, typo) if typo is not None else or_(matches, literal)
     relevance = case((exact, 2), (matches, 1), else_=0)
     return eligible, relevance.desc(), func.ts_rank_cd(vector, words).desc()
+
+
+def interest_order(topics: list[str], areas: list[str]):
+    vector = func.sscix_document(Discussion.title, Discussion.body)
+    ranking = []
+    for terms in (topics, areas):
+        if terms:
+            matches = [vector.bool_op("@@")(func.phraseto_tsquery("portuguese", func.sscix_normalize(term)))
+                       for term in terms]
+            ranking.append(sum(case((match, 1), else_=0) for match in matches).desc())
+    return tuple(ranking)

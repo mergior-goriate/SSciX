@@ -73,6 +73,10 @@ export default function Page() {
             <span><strong>Editar perfil</strong><small>Nome, fotografia, instituição e visibilidade.</small></span>
             <ArrowRight size={19} aria-hidden="true" />
           </Link>
+          <Link className="settings-profile-link" href="/onboarding?editar=1">
+            <span><strong>Personalizar o feed</strong><small>Áreas de interesse, temas e identificação opcional.</small></span>
+            <ArrowRight size={19} aria-hidden="true" />
+          </Link>
         </section>
         {categories.slice(1).map(({ id, label }) => (
           <section id={`settings-${id}`} className="panel settings-content" hidden={category !== id} key={id}>

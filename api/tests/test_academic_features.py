@@ -111,3 +111,55 @@ def test_affiliate_confirmation_and_refund(app_config, monkeypatch):
             row = db.get(AffiliateEvent, UUID(ref))
             assert row.conversion == "refunded"
             db.delete(row)
+
+
+def test_private_member_preferences_order_the_feed(app_config):
+    app, origin = app_config
+    from app.db import SessionFactory
+    from app.models import Profile, User
+    from app.security import PASSWORDS, now
+
+    uid = uuid4()
+    slug = f"preferencias-{uid.hex[:12]}"
+    email = f"{slug}@example.com"
+    password = "Palavra-passe de ensaio"
+    endpoint = f"{ROOT}/profiles/me/preferences"
+    with SessionFactory.begin() as db:
+        db.add(User(id=uid, email=email, password_hash=PASSWORDS.hash(password), verified_at=now(), terms_version="local-v1"))
+        db.flush()
+        db.add(Profile(user_id=uid, slug=slug, name="Ana de Ensaio", is_public=True, keywords=["Educação"]))
+
+    try:
+        with TestClient(app, base_url=origin, headers={"Origin": origin}) as client:
+            assert client.get(endpoint).status_code == 401
+            assert client.post(f"{ROOT}/auth/login", json={"email": email, "password": password}).status_code == 204
+            blank = {"gender": None, "areas": [], "topics": []}
+            assert client.get(endpoint).json() == blank
+            choices = {"gender": "nonbinary", "areas": ["Ambiente"], "topics": ["Gestão sustentável"]}
+            assert client.put(endpoint, json=choices).status_code == 204
+            assert client.get(endpoint).json() == choices
+            assert client.put(endpoint, json={**choices, "gender": "outro"}).status_code == 422
+            assert client.get(endpoint).json() == choices
+            for path in (f"{ROOT}/profiles/me", f"{ROOT}/profiles/{slug}"):
+                profile = client.get(path).json()
+                assert profile["keywords"] == ["Educação"]
+                assert "preferences" not in profile and "gender" not in profile
+
+            ids = []
+            for body in ("GESTAO sustentavel da água", "Monitoria do ambiente", "Estudo de linguística"):
+                post = client.post(f"{ROOT}/feed", json={"body": body})
+                assert post.status_code == 201, post.text
+                ids.append(post.json()["id"])
+
+            def order_of_created_posts(order):
+                response = client.get(f"{ROOT}/feed", params={"order": order})
+                assert response.status_code == 200, response.text
+                return [post["id"] for post in response.json() if post["id"] in ids]
+
+            assert order_of_created_posts("interests") == ids
+            assert order_of_created_posts("recent") == ids[::-1]
+            assert client.put(endpoint, json=blank).status_code == 204
+            assert order_of_created_posts("interests") == ids[::-1]
+    finally:
+        with SessionFactory.begin() as db:
+            db.execute(delete(User).where(User.id == uid))
