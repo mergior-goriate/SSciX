@@ -44,7 +44,6 @@ body { min-height: 100dvh; background-image: linear-gradient(165deg, #e1eef860, 
 .network-composer textarea { background: #f7faff; }
 .network-post, .saved-card { border-start-start-radius: 5px; }
 .network-post .feed-initials, .saved-card .feed-initials { border-radius: 50%; }
-.post-actions { column-gap: .65rem; }
 
 .own-profile-cover, .scholar-cover { border-bottom: 3px solid var(--brand-light); }
 .own-profile-nav, .settings-categories, .information-index { border-start-start-radius: 5px; }

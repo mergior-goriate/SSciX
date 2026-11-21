@@ -97,6 +97,8 @@ def test_admin_login_permissions_moderation_and_metrics(app_config):
         view = {"id": str(uuid4()), "page": "post", "target": posts[0]}
         assert member.post(f"{root}/events/page", json=view).status_code == 204
         assert member.post(f"{root}/events/page", json=view).status_code == 204
+        assert member.get(f"{root}/feed/{posts[0]}").json()["views"] == 1
+        assert member.get(f"{root}/feed/{posts[1]}").json()["views"] == 0
         today = now().astimezone(MAPUTO).date()
         params = {"start": str(today), "end": str(today)}
         result = admin.get(f"{root}/admin/metrics", params=params)

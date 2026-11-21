@@ -186,6 +186,9 @@ def test_academic_network_and_trajectory(account):
     assert client.post(replies, json={"body": "Quero colaborar."}).status_code == 201
     assert [entry["body"] for entry in client.get(replies).json()] == ["Quero colaborar."]
 
+    assert client.get(f"{feed}/{post_id}").json()["comments"] == 1
+    assert client.get(feed, params={"community_id": group_id}).json()[0]["comments"] == 1
+
     assert client.put(own, json={**profile, "is_public": False}).status_code == 200
     assert client.get(public).status_code == 404
     assert client.get(feed, params={"community_id": group_id}).json() == []
