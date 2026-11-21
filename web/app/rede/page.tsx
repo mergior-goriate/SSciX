@@ -10,7 +10,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
     <div className="network-layout">
       <NetworkSideNav active="/rede" />
       <section className="network-main" aria-labelledby="feed-title">
-        <header className="feed-masthead"><h1 id="feed-title">Feed académico</h1></header>
+        <h1 id="feed-title" className="feed-page-title">Feed académico</h1>
         <Feed key={query} initialQuery={query} />
       </section>
       <aside className="network-context" aria-label="Descobrir na SSciX">
