@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.exc import IntegrityError
 
 from .auth import DB, Member, get_user
-from .models import Follow, Profile, User
+from .models import Affiliation, Follow, Profile, User
 from .schemas import KeywordsInput, MyProfile, ProfileCoverInput, ProfileData, Slug
 from .security import require_origin
 
@@ -77,13 +77,24 @@ class FollowStatus(BaseModel):
 
 
 @router.get("", response_model=list[DirectoryProfile])
-def directory(db: DB, q: str = Query(default="", max_length=100), offset: int = Query(default=0, ge=0, le=1_999_980)):
+def directory(db: DB, q: str = Query(default="", max_length=100), offset: int = Query(default=0, ge=0, le=1_999_980),
+              institution: str = Query(default="", max_length=160), area: str = Query(default="", max_length=160)):
     query = select(Profile).join(User).where(Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False))
     term = q.strip()
+    def institution_match(value):
+        return or_(Profile.institution.icontains(value, autoescape=True), select(Affiliation.id).where(
+            Affiliation.user_id == Profile.user_id, Affiliation.institution.icontains(value, autoescape=True),
+            Affiliation.ended_on.is_(None) | (Affiliation.ended_on >= func.current_date()),
+        ).exists())
+
+    if institution.strip():
+        query = query.where(institution_match(institution.strip()))
+    if area.strip():
+        query = query.where(Profile.specialization.icontains(area.strip(), autoescape=True))
     if term:
         query = query.where(or_(
             Profile.name.icontains(term, autoescape=True),
-            Profile.institution.icontains(term, autoescape=True),
+            institution_match(term),
             Profile.specialization.icontains(term, autoescape=True),
         ))
     return db.scalars(query.order_by(Profile.name, Profile.slug).offset(offset).limit(21)).all()

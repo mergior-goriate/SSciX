@@ -23,6 +23,7 @@ class User(Base):
 
 
 class Profile(Base):
+    history_enabled: Mapped[bool] = mapped_column(Boolean, server_default="false")
     __tablename__ = "profiles"
     moderation_hidden: Mapped[bool] = mapped_column(Boolean, server_default="false")
     __table_args__ = (
@@ -92,6 +93,7 @@ class Follow(Base):
 
 
 class Community(Base):
+    is_private: Mapped[bool] = mapped_column(Boolean, server_default="false")
     __tablename__ = "communities"
     moderation_hidden: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
@@ -152,10 +154,85 @@ class Mention(Base):
 
 
 class DirectMessage(Base):
+    body_encrypted: Mapped[bool] = mapped_column(Boolean, server_default="false")
     __tablename__ = "direct_messages"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     sender_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     recipient_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CommunityMember(Base):
+    __tablename__ = "community_members"
+
+    community_id: Mapped[UUID] = mapped_column(ForeignKey("communities.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+
+
+class Activity(Base):
+    __tablename__ = "personal_activity"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(12))
+    query: Mapped[str] = mapped_column(String(100), server_default="")
+    post_id: Mapped[UUID | None] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Story(Base):
+    __tablename__ = "stories"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    author_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"), index=True)
+    community_id: Mapped[UUID | None] = mapped_column(ForeignKey("communities.id", ondelete="CASCADE"))
+    audience: Mapped[str] = mapped_column(String(12))
+    body: Mapped[str] = mapped_column(String(500))
+    image: Mapped[str] = mapped_column(Text, deferred=True)
+    link: Mapped[str] = mapped_column(String(1000))
+    archive: Mapped[bool] = mapped_column(Boolean)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class Affiliation(Base):
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __tablename__ = "affiliations"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"), index=True)
+    institution: Mapped[str] = mapped_column(String(160))
+    role: Mapped[str] = mapped_column(String(120))
+    started_on: Mapped[date | None] = mapped_column(Date)
+    ended_on: Mapped[date | None] = mapped_column(Date)
+
+
+class DiscussionRevision(Base):
+    __tablename__ = "discussion_revisions"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    post_id: Mapped[UUID] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"), index=True)
+    note: Mapped[str] = mapped_column(String(300))
+    previous_body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class InstitutionalRequest(Base):
+    __tablename__ = "institutional_requests"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    institution: Mapped[str] = mapped_column(String(160))
+    use_case: Mapped[str] = mapped_column(String(600))
+    status: Mapped[str] = mapped_column(String(16), server_default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AffiliateEvent(Base):
+    __tablename__ = "affiliate_events"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    campaign: Mapped[str] = mapped_column(String(64))
+    conversion: Mapped[str] = mapped_column(String(16), server_default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

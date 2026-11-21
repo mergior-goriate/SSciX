@@ -15,13 +15,15 @@ type Entry = {
 const PAGE_SIZE = 20;
 
 export default async function PeoplePage({ searchParams }: {
-  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
+  searchParams: Promise<{ q?: string | string[]; page?: string | string[]; institution?: string | string[]; area?: string | string[] }>;
 }) {
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q.trim().slice(0, 100) : "";
+  const institution = typeof params.institution === "string" ? params.institution.trim().slice(0, 160) : "";
+  const area = typeof params.area === "string" ? params.area.trim().slice(0, 160) : "";
   const requestedPage = typeof params.page === "string" ? Number(params.page) : 1;
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= 100_000 ? requestedPage : 1;
-  const query = new URLSearchParams({ q, offset: String((page - 1) * PAGE_SIZE) });
+  const query = new URLSearchParams({ q, institution, area, offset: String((page - 1) * PAGE_SIZE) });
   const response = await fetchMemberApi(`/api/v1/profiles?${query}`).catch(() => null);
   const entries: Entry[] = response?.ok ? await response.json() : [];
 
@@ -35,6 +37,8 @@ export default async function PeoplePage({ searchParams }: {
         <form action="/pessoas">
           <label htmlFor="people-query">Nome, instituição ou área de investigação</label>
           <input id="people-query" name="q" defaultValue={q} maxLength={100} type="search" />
+          <label>Instituição<input name="institution" defaultValue={institution} maxLength={160} /></label>
+          <label>Área de investigação<input name="area" defaultValue={area} maxLength={160} /></label>
           <button className="primary" type="submit"><Search size={17} aria-hidden="true" /> Pesquisar</button>
         </form>
         {!response?.ok ? <p role="status">A pesquisa está temporariamente indisponível.</p> :
@@ -53,9 +57,9 @@ export default async function PeoplePage({ searchParams }: {
               ))}
             </ul>}
         <nav className="hero-actions" aria-label="Páginas de resultados">
-          {page > 1 && <Link href={{ pathname: "/pessoas", query: { q, page: page - 1 } }}>Anterior</Link>}
+          {page > 1 && <Link href={{ pathname: "/pessoas", query: { q, institution, area, page: page - 1 } }}>Anterior</Link>}
           {entries.length > PAGE_SIZE && page < 100_000 &&
-            <Link href={{ pathname: "/pessoas", query: { q, page: page + 1 } }}>Seguinte</Link>}
+            <Link href={{ pathname: "/pessoas", query: { q, institution, area, page: page + 1 } }}>Seguinte</Link>}
         </nav>
       </section>
     </main>

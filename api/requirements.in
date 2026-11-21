@@ -4,4 +4,5 @@ SQLAlchemy>=2,<3
 alembic
 psycopg[binary]>=3,<4
 argon2-cffi
+cryptography
 email-validator

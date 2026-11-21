@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, BriefcaseBusiness, CircleHelp, Home, Shield, LogOut, Menu, MessageSquare, Settings, UserRound } from "lucide-react";
+import { Bookmark, BriefcaseBusiness, CircleHelp, History, Home, Shield, LogOut, Menu, MessageSquare, Settings, UserRound } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { api, message } from "./api-client";
 import NotificationPopover from "./notificacoes/notification-popover";
@@ -56,7 +56,9 @@ export default function Navigation() {
         {admin && <Link href="/admin" onClick={() => { if (menu.current) menu.current.open = false; }}>
           <Shield size={18} aria-hidden="true" /> Administração
         </Link>}
+        <Link href="/actividade" onClick={() => { if (menu.current) menu.current.open = false; }}><History size={18} aria-hidden="true" /> A minha actividade</Link>
         <Link href="/guardados" onClick={() => { if (menu.current) menu.current.open = false; }}><Bookmark size={18} aria-hidden="true" /> Guardados</Link>
+        <Link href="/plano-institucional" onClick={() => { if (menu.current) menu.current.open = false; }}><BriefcaseBusiness size={18} aria-hidden="true" /> Plano institucional</Link>
         <Link href="/oportunidades" onClick={() => { if (menu.current) menu.current.open = false; }}><BriefcaseBusiness size={18} aria-hidden="true" /> Oportunidades</Link>
         <Link href="/definicoes" onClick={() => { if (menu.current) menu.current.open = false; }}><Settings size={18} aria-hidden="true" /> Definições</Link>
         <Link href="/ajuda" onClick={() => { if (menu.current) menu.current.open = false; }}><CircleHelp size={18} aria-hidden="true" /> Centro de ajuda</Link>

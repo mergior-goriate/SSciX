@@ -834,3 +834,11 @@ body:has(.account-split) .site-footer { margin-top: 0; }
 .report-dialog::backdrop { background: #001d3977; }
 .report-actions { margin-top: .65rem; }
 .report-control > button { font-size: .8rem; min-height: 32px; padding: .3rem .6rem; }
+
+.academic-story-image {
+  display: block;
+  max-width: min(100%, 30rem);
+  max-height: 30rem;
+  object-fit: contain;
+  border-radius: .75rem;
+}
