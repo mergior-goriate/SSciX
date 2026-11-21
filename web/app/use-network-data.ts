@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, message } from "./api-client";
 
-export function useNetworkData<T>(path: string, revision = 0) {
+export function useNetworkData<T>(path: string | null, revision = 0) {
   const [data, setData] = useState<T>();
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
@@ -12,6 +12,7 @@ export function useNetworkData<T>(path: string, revision = 0) {
     let active = true;
     setError("");
     setData(undefined);
+    if (path === null) return;
     api<T>(path).then((result) => {
       if (active) setData(result);
     }).catch((failure) => {

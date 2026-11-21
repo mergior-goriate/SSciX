@@ -137,8 +137,11 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await topMenu.click();
     expect(await page.locator(".network-layout").evaluate((layout) =>
       getComputedStyle(layout).gridTemplateColumns.split(" ").length)).toBe(3);
-    await page.getByLabel("Criar publicação").fill(`Primeira publicação académica. @${peerSlug}`);
-    await page.getByRole("button", { name: "Publicar", exact: true }).click();
+    await page.getByRole("button", { name: "Criar publicação", exact: true }).click();
+    const publication = page.getByRole("dialog", { name: "Criar publicação" });
+    await publication.getByLabel("Criar publicação").fill(`Primeira publicação académica. @${peerSlug}`);
+    await publication.getByRole("button", { name: "Publicar", exact: true }).click();
+    await expect(publication).toBeHidden();
     await expect(page.getByText("Primeira publicação académica.")).toBeVisible();
     const desktopViewport = page.viewportSize()!;
     await page.setViewportSize({ width: 1280, height: 540 });
