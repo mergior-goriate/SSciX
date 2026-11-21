@@ -10,7 +10,6 @@ import NotificationPopover from "./notificacoes/notification-popover";
 const links = [
   ["/rede", "Início", Home],
   ["/mensagens", "Mensagens", MessageSquare],
-  ["/perfil", "Perfil", UserRound],
   ["/pessoas", "Networking", UsersRound],
 ] as const;
 
@@ -46,10 +45,8 @@ export default function Navigation() {
       const active = pathname === href || pathname.startsWith(href + "/");
       return <Fragment key={href}>
         {href === "/mensagens" && <NotificationPopover />}
-        <Link href={href} aria-label={label} title={label} aria-current={active ? "page" : undefined}
-          className={href === "/pessoas" ? "navigation-networking" : undefined}>
+        <Link href={href} aria-label={label} title={label} aria-current={active ? "page" : undefined}>
           <Icon size={21} aria-hidden="true" />
-          {href === "/pessoas" && <span>{label}</span>}
         </Link>
       </Fragment>;
     })}
@@ -59,6 +56,8 @@ export default function Navigation() {
         {admin && <Link href="/admin" onClick={() => { if (menu.current) menu.current.open = false; }}>
           <Shield size={18} aria-hidden="true" /> Administração
         </Link>}
+        <Link href="/perfil" aria-current={pathname === "/perfil" ? "page" : undefined}
+          onClick={() => { if (menu.current) menu.current.open = false; }}><UserRound size={18} aria-hidden="true" /> Meu perfil</Link>
         <Link href="/actividade" onClick={() => { if (menu.current) menu.current.open = false; }}><History size={18} aria-hidden="true" /> A minha actividade</Link>
         <Link href="/guardados" onClick={() => { if (menu.current) menu.current.open = false; }}><Bookmark size={18} aria-hidden="true" /> Guardados</Link>
         <Link href="/plano-institucional" onClick={() => { if (menu.current) menu.current.open = false; }}><BriefcaseBusiness size={18} aria-hidden="true" /> Plano institucional</Link>
