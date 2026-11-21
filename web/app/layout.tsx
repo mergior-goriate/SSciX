@@ -5,6 +5,7 @@ import "./styles.css";
 import "./visual-identity.css";
 import Navigation from "./navigation";
 import UsageTracker from "./usage-tracker";
+import { themeInitializationScript } from "./theme";
 
 export const metadata: Metadata = {
   title: { default: "SSciX | Rede académica", template: "%s | SSciX" },
@@ -13,7 +14,8 @@ export const metadata: Metadata = {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-MZ">
+    <html lang="pt-MZ" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} /></head>
       <body>
         <UsageTracker />
         <header className="site-header">

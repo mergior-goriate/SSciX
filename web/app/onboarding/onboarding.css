@@ -14,7 +14,7 @@
 .setup-choice input { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .setup-choice > span { display: flex; align-items: center; min-height: 44px; gap: .5rem; border: 1px solid var(--line); border-radius: .65rem; padding: .45rem .7rem; cursor: pointer; font-size: .9rem; font-weight: 650; overflow-wrap: anywhere; }
 .setup-choice input:not(:disabled):hover + span { border-color: var(--blue-mid); }
-.setup-choice :checked + span { box-shadow: inset 0 0 0 1px var(--brand); border-color: var(--brand); color: var(--brand-deep); background: var(--brand-wash); }
+.setup-choice :checked + span { box-shadow: inset 0 0 0 1px var(--brand); border-color: var(--brand); color: var(--ink); background: var(--brand-wash); }
 .setup-choice :focus-visible + span { outline: 3px solid var(--brand); outline-offset: 2px; }
 .setup-choice input:disabled, .setup-choice :disabled + span { opacity: .6; cursor: default; }
 .setup-areas .setup-choice > span { flex-direction: column; justify-content: center; min-height: 88px; text-align: center; line-height: 1.25; }
