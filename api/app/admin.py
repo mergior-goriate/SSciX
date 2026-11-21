@@ -8,6 +8,7 @@ from sqlalchemy import case, delete, func, or_, select, text
 
 from .admin_models import AdminAudit, AdminGrant, Report
 from .auth import DB, Member
+from .message_storage import read_message
 from .models import Community, DirectMessage, Discussion, Profile, Session, User
 from .schemas import Input, Slug
 from .security import limit, now, require_origin
@@ -240,10 +241,10 @@ def submit_report(data: ReportInput, db: DB, user: Member, request: Request):
         item = find_or_404(db, Profile, data.target_id)
         find_public_profile(db, item.slug)
     elif data.target_type == "community":
-        community_id = get_community(data.target_id, db).id
+        community_id = get_community(data.target_id, db, user.id).id
     else:
         item = find_or_404(db, Discussion, data.target_id)
-        visible_topic(db, item.parent_id or item.id)
+        visible_topic(db, item.parent_id or item.id, user.id)
         author = find_or_404(db, Profile, item.author_id)
         find_public_profile(db, author.slug)
         if item.moderation_hidden or (data.target_type == "attachment"
@@ -282,9 +283,12 @@ def report_detail(report_id: UUID, db: DB, grant: Access):
         link = f"/comunidades/{target.id}"
     history = db.scalars(select(AdminAudit).where(history_condition)
                          .order_by(AdminAudit.created_at.desc(), AdminAudit.id).limit(100)).all()
+    content = getattr(target, field, "") if target else None
+    if report.target_type == "message" and target:
+        content = read_message(target.body, target.body_encrypted)
     detail = {"id": report.id, "reason": report.reason, "state": report.state, "priority": report.priority,
               "target_type": report.target_type, "target_id": report.target_id, "community_id": report.community_id,
-              "content": getattr(target, field, "") if target else None, "link": link,
+              "content": content, "link": link,
               "has_image": bool(target and report.target_type == "attachment" and target.image),
               "assignee_id": report.assignee_id, "history": [
                   {"action": h.action, "reason": h.reason, "previous": h.previous, "result": h.result,

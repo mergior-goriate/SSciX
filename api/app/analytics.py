@@ -76,7 +76,7 @@ def page_event(data: PageEvent, db: DB, user: Member, request: Request):
     if data.page in ("post", "community"):
         if not data.target:
             raise HTTPException(422, "Indique o conteúdo visitado.")
-        community_id = (get_community(data.target, db).id if data.page == "community"
+        community_id = (get_community(data.target, db, user.id).id if data.page == "community"
                         else visible_topic(db, data.target, user.id).community_id)
     elif data.target:
         raise HTTPException(422, "A página não aceita um identificador.")

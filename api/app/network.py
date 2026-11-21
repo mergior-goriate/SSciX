@@ -12,9 +12,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
 from .auth import DB, Member, get_user
-from .models import Bookmark, Community, Discussion, Follow, Mention, Profile, Reaction, ReadingParticipant, User
+from .models import Bookmark, Community, CommunityMember, Discussion, Follow, Mention, Profile, Reaction, ReadingParticipant, User
 from .profiles import image_response, photo_url
 from .schemas import Input, Name, Slug, image_data, web_url
+from .search import publication_search
 from .security import limit, now, require_origin
 
 router = APIRouter(tags=["rede académica"])
@@ -37,9 +38,11 @@ class CommunityView(CommunityInput):
     id: UUID
     photo: str = ""
     can_edit_photo: bool = False
+    is_private: bool = False
 
 
 class CommunityCreate(CommunityInput):
+    is_private: bool = False
     photo: CommunityPhotoData = ""
 
 
@@ -84,18 +87,28 @@ class PostView(BaseModel):
     scheduled_date: date | None
     resolved: bool
     can_resolve: bool = False
+    can_edit: bool = False
 
 
-def visible_content():
+def accessible_communities(viewer: UUID | None):
+    allowed = Community.is_private.is_(False)
+    if viewer is not None:
+        allowed = or_(allowed, Community.owner_id == viewer, select(CommunityMember.user_id).where(
+            CommunityMember.community_id == Community.id, CommunityMember.user_id == viewer,
+        ).exists())
+    return Community.moderation_hidden.is_(False), allowed
+
+
+def visible_content(viewer: UUID | None = None):
     return (
         Discussion.moderation_hidden.is_(False),
         Discussion.community_id.is_(None) | Discussion.community_id.in_(
-            select(Community.id).where(Community.moderation_hidden.is_(False))),
+            select(Community.id).where(*accessible_communities(viewer))),
     )
 
 
 def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
-               viewer: UUID | None = None, offset: int = 0, popular: bool = False, by_deadline: bool = False):
+               viewer: UUID | None = None, offset: int = 0, popular: bool = False, by_deadline: bool = False, relevance=()):
     date_order = Discussion.created_at.desc() if newest else Discussion.created_at
     likes = select(func.count()).select_from(Reaction).join(User).where(
         Reaction.post_id == Discussion.id, User.deactivated_at.is_(None), User.suspended.is_(False),
@@ -109,8 +122,8 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
         .join(Profile, Profile.user_id == Discussion.author_id)
         .join(User, User.id == Profile.user_id)
         .outerjoin(Community, Community.id == Discussion.community_id)
-        .where(Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False), *visible_content(), *conditions)
-        .order_by(*([likes.desc()] if popular else [Discussion.scheduled_date.asc().nulls_last()] if by_deadline else []),
+        .where(Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False), *visible_content(viewer), *conditions)
+        .order_by(*relevance, *([likes.desc()] if popular else [Discussion.scheduled_date.asc().nulls_last()] if by_deadline else []),
                   date_order, Discussion.id)
         .offset(offset)
         .limit(page_size)
@@ -122,6 +135,7 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
             author_photo=photo_url(author), image=f"/api/v1/feed/{post.id}/image" if post.image and not post.attachment_hidden else "",
             article_url=post.article_url if not post.attachment_hidden else "", likes=likes, liked=liked, saved=saved,
             kind=post.kind, title=post.title, scheduled_date=post.scheduled_date, resolved=post.resolved,
+            can_edit=post.author_id == viewer,
             can_resolve=post.kind in CLOSABLE_KINDS and post.author_id == viewer,
         )
         for post, author, community, likes, liked, saved in db.execute(query)
@@ -141,9 +155,9 @@ def community_photo_url(community_id: UUID, has_photo: bool):
     return f"/api/v1/communities/{community_id}/photo" if has_photo else ""
 
 
-def get_community(community_id: UUID, db: DB):
-    value = db.get(Community, community_id)
-    if value is None or value.moderation_hidden:
+def get_community(community_id: UUID, db: DB, viewer: UUID | None = None):
+    value = db.scalar(select(Community).where(Community.id == community_id, *accessible_communities(viewer)))
+    if value is None:
         raise HTTPException(404, "Comunidade indisponível.")
     return value
 
@@ -151,30 +165,32 @@ def get_community(community_id: UUID, db: DB):
 def community_view(value: Community, user_id: UUID):
     return CommunityView(id=value.id, name=value.name, description=value.description,
                          photo=community_photo_url(value.id, bool(value.photo)),
-                         can_edit_photo=value.owner_id == user_id)
+                         can_edit_photo=value.owner_id == user_id, is_private=value.is_private)
 
 
 @router.get("/communities", response_model=list[CommunityView])
-def communities(db: DB):
-    rows = db.execute(select(Community.id, Community.name, Community.description, Community.photo != "")
-                      .where(Community.moderation_hidden.is_(False)).order_by(Community.name).limit(100))
-    return [CommunityView(id=cid, name=name, description=description, photo=community_photo_url(cid, has_photo))
-            for cid, name, description, has_photo in rows]
+def communities(db: DB, user: Member):
+    rows = db.execute(select(Community.id, Community.name, Community.description, Community.photo != "",
+                             Community.is_private)
+                      .where(*accessible_communities(user.id)).order_by(Community.name).limit(100))
+    return [CommunityView(id=cid, name=name, description=description, is_private=private,
+                          photo=community_photo_url(cid, has_photo))
+            for cid, name, description, has_photo, private in rows]
 
 
 @router.get("/communities/{community_id}", response_model=CommunityView)
 def community(community_id: UUID, db: DB, user: Member):
-    return community_view(get_community(community_id, db), user.id)
+    return community_view(get_community(community_id, db, user.id), user.id)
 
 
 @router.get("/communities/{community_id}/photo")
-def community_photo(community_id: UUID, db: DB):
-    return image_response(get_community(community_id, db).photo)
+def community_photo(community_id: UUID, db: DB, user: Member):
+    return image_response(get_community(community_id, db, user.id).photo)
 
 
 @router.put("/communities/{community_id}/photo", response_model=CommunityView, dependencies=same_origin)
 def update_community_photo(community_id: UUID, data: CommunityPhoto, db: DB, user: Member, request: Request):
-    value = get_community(community_id, db)
+    value = get_community(community_id, db, user.id)
     if value.owner_id != user.id:
         raise HTTPException(403, "Só o criador pode alterar a fotografia da comunidade.")
     limit(request, "community-photo", 12, str(user.id))
@@ -212,7 +228,7 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
     if author is not None:
         conditions.append(Profile.slug == author)
     if community_id is not None:
-        get_community(community_id, db)
+        get_community(community_id, db, user.id)
         conditions.append(Discussion.community_id == community_id)
     if content == "articles":
         conditions.extend((Discussion.article_url != "", Discussion.attachment_hidden.is_(False), Discussion.kind.not_in(OPPORTUNITY_KINDS)))
@@ -235,13 +251,13 @@ def feed(db: DB, user: Member, following: bool = False, community_id: UUID | Non
             ))
     elif content:
         conditions.append(Discussion.kind == content)
-    term = q.strip()
-    if term:
-        conditions.append(or_(
-            Discussion.title.icontains(term, autoescape=True),
-            Discussion.body.icontains(term, autoescape=True),
-        ))
-    return read_posts(db, *conditions, viewer=viewer, offset=offset, page_size=page_size,
+    relevance = ()
+    if term := q.strip():
+        predicate, *ranking = publication_search(term)
+        conditions.append(predicate)
+        if order == "recent":
+            relevance = tuple(ranking)
+    return read_posts(db, *conditions, viewer=viewer, offset=offset, page_size=page_size, relevance=relevance,
                       popular=order == "popular", by_deadline=content == "opportunities" and order == "deadline")
 
 
@@ -260,7 +276,7 @@ def publish(data: PostInput, db: DB, request: Request):
     if data.kind == "post" and (data.title or data.scheduled_date):
         raise HTTPException(422, "O título e a data destinam-se às actividades da comunidade.")
     if data.community_id is not None:
-        get_community(data.community_id, db)
+        get_community(data.community_id, db, author.user_id)
     post = Discussion(**data.model_dump(), author_id=author.user_id)
     db.add(post)
     db.flush()
@@ -298,14 +314,14 @@ class ReadingContact(Input):
     whatsapp: Annotated[str, StringConstraints(pattern=r"^(?:[1-9][0-9]{6,14})?$")] = ""
 
 
-def require_reading(db: DB, post_id: UUID):
-    if visible_topic(db, post_id).kind != "reading":
+def require_reading(db: DB, post_id: UUID, viewer: UUID):
+    if visible_topic(db, post_id, viewer).kind != "reading":
         raise HTTPException(404, "Sessão de leitura indisponível.")
 
 
 @router.get("/feed/{post_id}/participants")
 def reading_participants(post_id: UUID, db: DB, user: Member, response: Response):
-    require_reading(db, post_id)
+    require_reading(db, post_id, user.id)
     response.headers["Cache-Control"] = "private, no-store"
     own = db.get(ReadingParticipant, (post_id, user.id))
     if own is None:
@@ -325,7 +341,7 @@ def reading_participants(post_id: UUID, db: DB, user: Member, response: Response
 
 @router.put("/feed/{post_id}/participants/me", status_code=204, dependencies=same_origin)
 def join_reading(post_id: UUID, data: ReadingContact, db: DB, user: Member, request: Request):
-    require_reading(db, post_id)
+    require_reading(db, post_id, user.id)
     limit(request, "reading-participation", 30, str(user.id))
     db.execute(insert(ReadingParticipant).values(post_id=post_id, user_id=user.id, whatsapp=data.whatsapp)
                .on_conflict_do_update(index_elements=["post_id", "user_id"], set_={"whatsapp": data.whatsapp}))
@@ -341,34 +357,34 @@ def leave_reading(post_id: UUID, db: DB, user: Member, request: Request):
 
 
 @router.get("/feed/{post_id}/image")
-def post_image(post_id: UUID, db: DB):
+def post_image(post_id: UUID, db: DB, user: Member):
     post = db.scalar(select(Discussion).join(Profile, Profile.user_id == Discussion.author_id).join(
         User, User.id == Profile.user_id,
     ).where(Discussion.id == post_id, Discussion.parent_id.is_(None), Profile.is_public.is_(True), Profile.moderation_hidden.is_(False),
-            User.deactivated_at.is_(None), User.suspended.is_(False), *visible_content(), Discussion.attachment_hidden.is_(False)))
+            User.deactivated_at.is_(None), User.suspended.is_(False), *visible_content(user.id), Discussion.attachment_hidden.is_(False)))
     return image_response(post.image if post else "")
 
 
 @router.get("/feed/{post_id}/replies", response_model=list[PostView])
-def replies(post_id: UUID, db: DB):
-    visible_topic(db, post_id)
+def replies(post_id: UUID, db: DB, user: Member):
+    visible_topic(db, post_id, user.id)
     parent, author = aliased(Discussion), aliased(Profile)
     visible_parent = select(parent.id).join(author, author.user_id == parent.author_id).join(
         User, User.id == author.user_id,
     ).where(author.is_public.is_(True), User.deactivated_at.is_(None), User.suspended.is_(False))
-    return read_posts(db, Discussion.parent_id == post_id, Discussion.parent_id.in_(visible_parent), newest=False)
+    return read_posts(db, Discussion.parent_id == post_id, Discussion.parent_id.in_(visible_parent), newest=False, viewer=user.id)
 
 
 @router.post("/feed/{post_id}/replies", status_code=201, response_model=PostView, dependencies=same_origin)
 def reply(post_id: UUID, data: ReplyInput, db: DB, request: Request):
     author = public_author(db, request)
-    topic = visible_topic(db, post_id)
+    topic = visible_topic(db, post_id, author.user_id)
     post = Discussion(body=data.body, author_id=author.user_id, parent_id=topic.id, community_id=topic.community_id)
     db.add(post)
     db.flush()
     recipient = db.scalar(select(Discussion.author_id).where(Discussion.id == topic.id)) if topic.kind == "collaboration" else None
     record_mentions(db, post, recipient)
-    value = read_posts(db, Discussion.id == post.id)[0]
+    value = read_posts(db, Discussion.id == post.id, viewer=author.user_id)[0]
     db.commit()
     return value
 
@@ -415,7 +431,7 @@ def write_action(post_id: UUID, action: str, enabled: bool, db: DB, request: Req
     model = {"like": Reaction, "save": Bookmark}.get(action)
     if model is None:
         raise HTTPException(404, "Acção indisponível.")
-    visible_topic(db, post_id)
+    visible_topic(db, post_id, user.id)
     if enabled:
         db.execute(insert(model).values(user_id=user.id, post_id=post_id).on_conflict_do_nothing())
     else:
@@ -438,7 +454,7 @@ def notifications(db: DB, request: Request):
         select(Mention, Discussion, Profile, collaboration_reply).join(Discussion, Discussion.id == Mention.post_id)
         .join(Profile, Profile.user_id == Discussion.author_id).join(User, User.id == Profile.user_id)
         .where(Mention.recipient_id == user.id, Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False),
-               *visible_content(), Discussion.parent_id.is_(None) | Discussion.parent_id.in_(visible_parents))
+               *visible_content(user.id), Discussion.parent_id.is_(None) | Discussion.parent_id.in_(visible_parents))
         .order_by(Discussion.created_at.desc(), Discussion.id).limit(40)
     )
     return [

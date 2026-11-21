@@ -30,6 +30,8 @@ cffi==2.1.1
     # via
     #   -r sscix/api/requirements.txt
     #   argon2-cffi-bindings
+cryptography==50.0.2
+    # via -r sscix/api/requirements.txt
 click==8.5.1
     # via
     #   -r sscix/api/requirements.txt

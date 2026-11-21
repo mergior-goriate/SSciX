@@ -379,6 +379,7 @@ export default function AdminScreen() {
           }}>{label}</button>)}
       </nav>
       <Link href="/rede">Voltar à rede</Link>
+      {grant.role === "admin" && <Link href="/admin/comercial">Gestão comercial</Link>}
       {process.env.NEXT_PUBLIC_EDITORIAL_ADMIN_URL && grant.role === "admin" &&
         <a href={process.env.NEXT_PUBLIC_EDITORIAL_ADMIN_URL}>Painel editorial</a>}
     </aside>

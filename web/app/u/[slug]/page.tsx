@@ -1,3 +1,4 @@
+import { Affiliations } from "../../academic-ui";
 import ReportButton from "../../report-button";
 import { fetchMemberApi } from "../../../member-api";
 import Link from "next/link";
@@ -69,6 +70,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
             <h2>Publicações</h2>
             <ProfilePosts slug={profile.slug} />
           </section>
+          <Affiliations slug={profile.slug} />
           <div className="scholar-grid">
             {(affiliations.length > 0 || profile.keywords.length > 0 || profile.social_links.length > 0) && (
               <section className="panel public-profile" id="informacao">

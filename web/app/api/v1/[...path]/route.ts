@@ -11,7 +11,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const url = new URL("/api/v1/" + path.join("/"), base);
   url.search = request.nextUrl.search;
   const headers = new Headers();
-  for (const name of ["cookie", "origin", "content-type"]) {
+  for (const name of ["cookie", "origin", "content-type", "authorization"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
@@ -19,7 +19,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (request.body) {
     const reader = request.body.getReader();
     const route = path.join("/");
-    const communityPhoto = (request.method === "POST" && route === "communities")
+    const communityPhoto = (request.method === "POST" && (route === "communities" || route === "stories"))
       || (request.method === "PUT" && /^communities\/[a-f0-9-]{36}\/photo$/i.test(route));
     const limit = communityPhoto || (request.method === "PUT" && route === "profiles/me") ? 425000
       : (request.method === "POST" && route === "feed") ||
@@ -47,7 +47,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   try {
     const upstream = await fetch(url, { method: request.method, headers, body, cache: "no-store", redirect: "manual" });
     const result = new Headers();
-    for (const name of ["content-type", "cache-control", "retry-after", "x-content-type-options"]) {
+    for (const name of ["content-type", "cache-control", "retry-after", "x-content-type-options", "location"]) {
       const value = upstream.headers.get(name);
       if (value) result.set(name, value);
     }

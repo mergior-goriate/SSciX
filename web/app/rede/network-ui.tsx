@@ -8,6 +8,9 @@ import Avatar from "../avatar";
 import { readImage } from "../media";
 import FollowButton from "../u/[slug]/follow-button";
 import ReportButton from "../report-button";
+import { CommunityAccess, PublicationRevisions } from "../academic-ui";
+import { useNetworkData } from "../use-network-data";
+export { useNetworkData } from "../use-network-data";
 import ReadingParticipants from "./reading-participants";
 
 const opportunityLabels = {
@@ -45,8 +48,9 @@ type Post = {
   scheduled_date: string | null;
   resolved: boolean;
   can_resolve: boolean;
+  can_edit: boolean;
 };
-type Community = { id: string; name: string; description: string; photo: string; can_edit_photo: boolean };
+type Community = { id: string; name: string; description: string; photo: string; can_edit_photo: boolean; is_private: boolean };
 
 function CommunityPortrait({ photo }: { photo?: string }) {
   return <span className="community-list-icon" aria-hidden="true">
@@ -59,26 +63,6 @@ function CommunityPhotoInput({ required = false }: { required?: boolean }) {
     <input type="file" name="photo_file" accept="image/png,image/jpeg,image/webp" required={required} />
     <small>PNG, JPEG ou WebP, até 260 KB.</small>
   </label>;
-}
-
-export function useNetworkData<T>(path: string, revision = 0) {
-  const [data, setData] = useState<T>();
-  const [error, setError] = useState("");
-  const [version, setVersion] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    setError("");
-    setData(undefined);
-    api<T>(path).then((result) => {
-      if (active) setData(result);
-    }).catch((failure) => {
-      if (active) setError(failure?.status === 401 ? "Inicie sessão para consultar esta secção." : message(failure));
-    });
-    return () => { active = false; };
-  }, [path, version, revision]);
-
-  return { data, error, refresh: () => setVersion((value) => value + 1) };
 }
 
 const emojis = ["😊", "👏", "💡", "🔬", "📚", "✅", "🤝", "🎓"];
@@ -429,15 +413,15 @@ export function CommunityHighlights() {
 
 const feedPageSize = 20;
 
-export function Feed({ communityId, opportunities }: { communityId?: string; opportunities?: boolean }) {
+export function Feed({ communityId, opportunities, initialQuery = "" }: { communityId?: string; opportunities?: boolean; initialQuery?: string }) {
   const [category, setCategory] = useState("");
   const [savedOnly, setSavedOnly] = useState(false);
   const [deadline, setDeadline] = useState("");
   const [openOnly, setOpenOnly] = useState(true);
   const [following, setFollowing] = useState(false);
   const [filter, setFilter] = useState<PostFilter>("all");
-  const [query, setQuery] = useState("");
-  const [draft, setDraft] = useState("");
+  const [query, setQuery] = useState(initialQuery);
+  const [draft, setDraft] = useState(initialQuery);
   const [order, setOrder] = useState<"recent" | "popular" | "deadline">("recent");
   const [page, setPage] = useState(0);
   const params = new URLSearchParams({ order, offset: String(page * feedPageSize), page_size: String(feedPageSize + 1) });
@@ -455,7 +439,9 @@ export function Feed({ communityId, opportunities }: { communityId?: string; opp
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setQuery(draft.trim());
+    const term = draft.trim();
+    if (term) void api("/activity", "POST", { query: term }).catch(() => undefined);
+    setQuery(term);
     setPage(0);
   }
 
@@ -548,6 +534,10 @@ export function Topic({ id }: { id: string }) {
   const replies = useNetworkData<Post[]>(`/feed/${id}/replies`);
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
+  const loadedId = topic.data?.id;
+  useEffect(() => {
+    if (loadedId) void api("/activity", "POST", { post_id: loadedId }).catch(() => undefined);
+  }, [loadedId]);
   if (topic.error) return <p role="alert">{topic.error}</p>;
   if (!topic.data) return <p role="status">A carregar o debate…</p>;
 
@@ -566,6 +556,7 @@ export function Topic({ id }: { id: string }) {
 
   return <div className="network-stack">
     <PostCard post={topic.data} topic />
+    <PublicationRevisions id={id} body={topic.data.body} canEdit={topic.data.can_edit} onSaved={topic.refresh} />
     {topic.data.can_resolve && !topic.data.resolved &&
       <button className="secondary" type="button" disabled={resolving} onClick={() => void resolve()}>{isOpportunity(topic.data.kind) ? "Encerrar oportunidade" : "Marcar como resolvido"}</button>}
     {resolveError && <p className="notice error" role="alert">{resolveError}</p>}
@@ -593,9 +584,9 @@ export function CommunityDirectory() {
     setBusy(true);
     setFailure("");
     try {
-      const { photo_file, ...fields } = Object.fromEntries(new FormData(form));
+      const { photo_file, is_private, ...fields } = Object.fromEntries(new FormData(form));
       const photo = photo_file instanceof File && photo_file.size ? await readImage(photo_file, 260 * 1024) : "";
-      await api("/communities", "POST", { ...fields, photo });
+      await api("/communities", "POST", { ...fields, photo, is_private: Boolean(is_private) });
       form.reset();
       dialog.current?.close();
       setSearch("");
@@ -649,6 +640,7 @@ export function CommunityDirectory() {
         <label>Nome<input name="name" minLength={2} maxLength={120} required /></label>
         <label>Âmbito da comunidade<textarea name="description" rows={3} maxLength={600} required /></label>
         <CommunityPhotoInput />
+        <label><input name="is_private" type="checkbox" /> Comunidade privada</label>
         <button className="primary" disabled={busy}>Criar comunidade</button>
         {failure && <p className="notice error" role="alert">{failure}</p>}
       </form>
@@ -692,7 +684,8 @@ export function CommunityPage({ id }: { id: string }) {
         <div className="community-directory community-detail-grid">
           <section className="community-debates" aria-labelledby="community-debates-title">
             <h2 id="community-debates-title">Debates</h2>
-            <Feed communityId={id} />
+            {data.is_private && data.can_edit_photo && <CommunityAccess id={id} />}
+        <Feed communityId={id} />
           </section>
           <aside className="panel community-guide community-about">
             <h2><BookOpen size={20} aria-hidden="true" /> Sobre a comunidade</h2>
