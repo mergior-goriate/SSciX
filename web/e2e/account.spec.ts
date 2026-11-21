@@ -59,12 +59,12 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     const route = new URL(`/u/${slug}`, page.url()).href;
     await visitor.goto(route);
     await expect(visitor).toHaveURL(/\/entrar$/);
-    await page.getByLabel("Instituição", { exact: true }).fill("Universidade de ensaio");
+    await page.locator("#informacao-academica").getByLabel("Instituição", { exact: true }).fill("Universidade de ensaio");
     await page.getByRole("checkbox", { name: /Tornar o perfil público/ }).check();
     await page.getByRole("button", { name: "Guardar perfil" }).click();
     await expect(page.getByText("Perfil guardado.")).toBeVisible();
     await page.reload();
-    await expect(page.getByLabel("Instituição", { exact: true })).toHaveValue("Universidade de ensaio");
+    await expect(page.locator("#informacao-academica").getByLabel("Instituição", { exact: true })).toHaveValue("Universidade de ensaio");
     for (const path of ["/rede", "/comunidades", "/mensagens", "/pessoas", "/notificacoes", "/perfil"]) {
       const response = await visitor.request.get(new URL(path, route).href, { maxRedirects: 0 });
       expect(response.status()).toBe(307);
@@ -157,6 +157,28 @@ test("regista, confirma, publica, recupera e elimina uma conta", async ({ page, 
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.setViewportSize(desktopViewport);
     const firstPost = page.getByRole("article").filter({ hasText: "Primeira publicação académica." });
+    await page.setViewportSize({ width: 375, height: 800 });
+    const interactions = firstPost.getByRole("group", { name: "Interacções da publicação" });
+    const distinctRows = await interactions.evaluate((row) => new Set(
+      Array.from(row.children, (item) => item.getBoundingClientRect().top),
+    ).size);
+    expect(distinctRows).toBe(1);
+    await interactions.getByRole("button", { name: /Gostar/ }).click();
+    await expect(interactions.getByRole("button", { name: /1 gosto$/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(interactions.getByRole("img", { name: "0 visualizações da publicação" })).toBeVisible();
+    await interactions.locator("summary").click();
+    await interactions.getByRole("button", { name: "Denunciar", exact: true }).click();
+    const report = page.getByRole("dialog", { name: "Denunciar", exact: true });
+    await expect(report).toBeVisible();
+    await report.getByRole("button", { name: "Fechar" }).click();
+    await interactions.locator("summary").click();
+    await interactions.getByRole("link", { name: /Comentar.*0 comentários/ }).click();
+    await page.getByLabel("Comentar", { exact: true }).fill("Comentário de ensaio.");
+    await page.getByRole("button", { name: "Comentar", exact: true }).click();
+    await expect(page.getByRole("link", { name: /1 comentário$/ })).toBeVisible();
+    await page.goto("/rede");
+    await expect(firstPost.getByRole("img", { name: "1 visualização da publicação" })).toBeVisible();
+    await page.setViewportSize(desktopViewport);
     await firstPost.getByRole("button", { name: "Guardar", exact: true }).click();
     await expect(firstPost.getByRole("button", { name: "Guardado", exact: true })).toBeVisible();
     await page.goto("/guardados");

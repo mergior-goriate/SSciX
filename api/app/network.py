@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
+from .admin_models import UsageEvent
 from .auth import DB, Member, get_user
 from .models import Bookmark, Community, CommunityMember, Discussion, Follow, Mention, Profile, Reaction, ReadingParticipant, User
 from .profiles import image_response, photo_url
@@ -80,6 +81,8 @@ class PostView(BaseModel):
     image: str
     article_url: str
     likes: int
+    comments: int = 0
+    views: int = 0
     liked: bool = False
     saved: bool = False
     kind: PostKind
@@ -108,7 +111,8 @@ def visible_content(viewer: UUID | None = None):
 
 
 def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
-               viewer: UUID | None = None, offset: int = 0, popular: bool = False, by_deadline: bool = False, relevance=()):
+               viewer: UUID | None = None, offset: int = 0, popular: bool = False, by_deadline: bool = False,
+               relevance=(), include_metrics: bool = True):
     date_order = Discussion.created_at.desc() if newest else Discussion.created_at
     likes = select(func.count()).select_from(Reaction).join(User).where(
         Reaction.post_id == Discussion.id, User.deactivated_at.is_(None), User.suspended.is_(False),
@@ -128,17 +132,34 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
         .offset(offset)
         .limit(page_size)
     )
+    rows = db.execute(query).all()
+    ids = [row[0].id for row in rows if row[0].parent_id is None] if include_metrics else []
+    comments, views = {}, {}
+    if ids:
+        comments = dict(db.execute(
+            select(Discussion.parent_id, func.count())
+            .join(Profile, Profile.user_id == Discussion.author_id).join(User, User.id == Profile.user_id)
+            .where(Discussion.parent_id.in_(ids), Profile.is_public.is_(True), Profile.moderation_hidden.is_(False),
+                   User.deactivated_at.is_(None), User.suspended.is_(False), *visible_content(viewer))
+            .group_by(Discussion.parent_id)
+        ).all())
+        views = dict(db.execute(
+            select(UsageEvent.target_id, func.count())
+            .where(UsageEvent.kind == "page", UsageEvent.page == "post", UsageEvent.target_id.in_(ids))
+            .group_by(UsageEvent.target_id)
+        ).all())
     return [
         PostView(
             id=post.id, body=post.body, author_name=author.name, author_slug=author.slug,
             created_at=post.created_at.isoformat(), community_id=post.community_id, community_name=community,
             author_photo=photo_url(author), image=f"/api/v1/feed/{post.id}/image" if post.image and not post.attachment_hidden else "",
             article_url=post.article_url if not post.attachment_hidden else "", likes=likes, liked=liked, saved=saved,
+            comments=comments.get(post.id, 0), views=views.get(post.id, 0),
             kind=post.kind, title=post.title, scheduled_date=post.scheduled_date, resolved=post.resolved,
             can_edit=post.author_id == viewer,
             can_resolve=post.kind in CLOSABLE_KINDS and post.author_id == viewer,
         )
-        for post, author, community, likes, liked, saved in db.execute(query)
+        for post, author, community, likes, liked, saved in rows
     ]
 
 
@@ -286,8 +307,9 @@ def publish(data: PostInput, db: DB, request: Request):
     return value
 
 
-def visible_topic(db: DB, post_id: UUID, viewer: UUID | None = None):
-    posts = read_posts(db, Discussion.id == post_id, Discussion.parent_id.is_(None), viewer=viewer)
+def visible_topic(db: DB, post_id: UUID, viewer: UUID | None = None, *, include_metrics: bool = False):
+    posts = read_posts(db, Discussion.id == post_id, Discussion.parent_id.is_(None),
+                       viewer=viewer, include_metrics=include_metrics)
     if not posts:
         raise HTTPException(404, "Publicação indisponível.")
     return posts[0]
@@ -295,7 +317,7 @@ def visible_topic(db: DB, post_id: UUID, viewer: UUID | None = None):
 
 @router.get("/feed/{post_id}", response_model=PostView)
 def topic(post_id: UUID, db: DB, user: Member):
-    return visible_topic(db, post_id, user.id)
+    return visible_topic(db, post_id, user.id, include_metrics=True)
 
 
 @router.put("/feed/{post_id}/resolved", response_model=PostView, dependencies=same_origin)
@@ -307,7 +329,7 @@ def resolve_topic(post_id: UUID, db: DB, user: Member):
         raise HTTPException(403, "Só o autor pode encerrar esta publicação.")
     db.execute(update(Discussion).where(Discussion.id == post_id).values(resolved=True))
     db.commit()
-    return visible_topic(db, post_id, user.id)
+    return visible_topic(db, post_id, user.id, include_metrics=True)
 
 
 class ReadingContact(Input):

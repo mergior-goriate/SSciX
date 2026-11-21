@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
-import { ArrowLeft, ArrowRight, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, BookOpen, Paperclip, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, Forward, Smile } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileText, Image as ImageIcon, LockKeyhole, MessageSquare, BookOpen, Paperclip, Plus, Search, Users, X, Bookmark, Heart, ImagePlus, Link as LinkIcon, MessageCircle, ChartNoAxesColumnIncreasing, Ellipsis, Send, Smile } from "lucide-react";
 import Avatar from "../avatar";
 import { readImage } from "../media";
 import FollowButton from "../u/[slug]/follow-button";
@@ -38,6 +38,8 @@ type Post = {
   image: string;
   article_url: string;
   likes: number;
+  comments: number;
+  views: number;
   liked: boolean;
   saved: boolean;
   author_slug: string;
@@ -268,7 +270,9 @@ export function ResearcherDiscovery({ similarTo }: { similarTo?: string }) {
 
 type Actions = { liked: boolean; saved: boolean; likes: number };
 
-function PostActions({ post, onChange }: { post: Post; onChange?: () => void }) {
+const compactCount = new Intl.NumberFormat("pt-MZ", { notation: "compact", maximumFractionDigits: 1 });
+
+function PostActions({ post, onChange, report }: { post: Post; onChange?: () => void; report?: boolean }) {
   const path = `/feed/${post.id}/actions`;
   const [actions, setActions] = useState<Actions>({ liked: post.liked, saved: post.saved, likes: post.likes });
   const [busy, setBusy] = useState(false);
@@ -294,6 +298,7 @@ function PostActions({ post, onChange }: { post: Post; onChange?: () => void }) 
   async function share() {
     const url = new URL(`/rede/${post.id}`, window.location.origin).href;
     setFeedback("");
+    setShareUrl("");
     try {
       await navigator.clipboard.writeText(url);
       setFeedback("Ligação copiada.");
@@ -302,18 +307,38 @@ function PostActions({ post, onChange }: { post: Post; onChange?: () => void }) 
     }
   }
 
+  const saveLabel = actions.saved ? (onChange ? "Remover dos guardados" : "Guardado") : "Guardar";
+  const commentLabel = post.comments === 1 ? "1 comentário" : `${post.comments} comentários`;
+  const viewsLabel = post.views === 1 ? "1 visualização da publicação" : `${post.views} visualizações da publicação`;
+
   return <>
-    <div className="post-actions">
+    <div className="post-actions" role="group" aria-label="Interacções da publicação">
       <button type="button" aria-pressed={actions.liked} data-confirmed={animatedAction === "like" || undefined}
+        aria-label={`Gostar · ${actions.likes} ${actions.likes === 1 ? "gosto" : "gostos"}`} title="Gostar"
         disabled={busy} onClick={() => void toggle("like", actions.liked)}>
-        <Heart size={18} aria-hidden="true" /> Gostar <span aria-label={`${actions.likes} gostos`}>{actions.likes}</span>
+        <Heart size={20} aria-hidden="true" />{compactCount.format(actions.likes)}
       </button>
-      <Link href={`/rede/${post.id}#comentarios`}><MessageCircle size={18} aria-hidden="true" /> Comentar</Link>
-      <button type="button" onClick={() => void share()}><Forward size={18} aria-hidden="true" /> Partilhar</button>
+      <Link href={`/rede/${post.id}#comentarios`} aria-label={`Comentar · ${commentLabel}`} title={commentLabel}>
+        <MessageCircle size={20} aria-hidden="true" />{compactCount.format(post.comments)}
+      </Link>
+      <span className="post-views" role="img" aria-label={viewsLabel} title={viewsLabel}>
+        <ChartNoAxesColumnIncreasing size={20} aria-hidden="true" />{compactCount.format(post.views)}
+      </span>
       <button type="button" aria-pressed={actions.saved} data-confirmed={animatedAction === "save" || undefined}
+        aria-label={saveLabel} title={actions.saved ? "Remover dos guardados" : "Guardar"}
         disabled={busy} onClick={() => void toggle("save", actions.saved)}>
-        <Bookmark size={18} aria-hidden="true" /> {actions.saved ? (onChange ? "Remover dos guardados" : "Guardado") : "Guardar"}
+        <Bookmark size={20} aria-hidden="true" />
       </button>
+      <button type="button" aria-label="Partilhar" title="Partilhar" onClick={() => void share()}>
+        <Send size={20} aria-hidden="true" />
+      </button>
+      {report && <details className="post-more">
+        <summary aria-label="Mais opções" title="Mais opções"><Ellipsis size={21} aria-hidden="true" /></summary>
+        <div className="panel post-more-options">
+          <ReportButton kind="post" id={post.id} />
+          {(post.image || post.article_url) && <ReportButton kind="attachment" id={post.id} label="Denunciar anexo" />}
+        </div>
+      </details>}
     </div>
     {shareUrl && <label>Ligação para partilhar<input value={shareUrl} readOnly onFocus={(event) => event.currentTarget.select()} /></label>}
     {feedback && <p className="muted" role="status">{feedback}</p>}
@@ -344,11 +369,10 @@ function PostCard({ post, topic, onChange }: { post: Post; topic?: boolean; onCh
     {post.article_url && <a className="icon-action" href={post.article_url} rel="noopener noreferrer" target="_blank">
       <LinkIcon size={17} aria-hidden="true" /> {isOpportunity(post.kind) ? "Consultar anúncio" : "Abrir artigo"}
     </a>}
-    {topic && <PostActions post={post} onChange={onChange} />}
-    <div className="profile-actions report-actions">
+    {topic ? <PostActions post={post} onChange={onChange} report /> : <div className="profile-actions report-actions">
       <ReportButton kind="post" id={post.id} />
       {(post.image || post.article_url) && <ReportButton kind="attachment" id={post.id} label="Denunciar anexo" />}
-    </div>
+    </div>}
   </article>;
 }
 
@@ -606,7 +630,7 @@ export function Topic({ id }: { id: string }) {
     {topic.data.kind === "reading" && <ReadingParticipants postId={id} />}
     <h2 id="comentarios">Comentários</h2>
     <Posts data={replies.data} error={replies.error} empty="Ainda não há respostas." />
-    <Composer endpoint={`/feed/${id}/replies`} label="Comentar" onSaved={replies.refresh} />
+    <Composer endpoint={`/feed/${id}/replies`} label="Comentar" onSaved={() => { replies.refresh(); topic.refresh(); }} />
   </div>;
 }
 
