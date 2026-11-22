@@ -33,6 +33,6 @@ export const config = {
   matcher: [
     "/rede/:path*", "/artigos/:path*", "/pessoas/:path*", "/u/:path*", "/comunidades/:path*",
     "/mensagens/:path*", "/notificacoes/:path*", "/perfil/:path*", "/guardados/:path*", "/actividade/:path*", "/plano-institucional/:path*",
-    "/admin/:path*", "/definicoes/:path*", "/onboarding/:path*", "/oportunidades/:path*",
+    "/admin/:path*", "/blogue/escrever", "/definicoes/:path*", "/onboarding/:path*", "/oportunidades/:path*",
   ],
 };

@@ -21,7 +21,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const route = path.join("/");
     const communityPhoto = (request.method === "POST" && (route === "communities" || route === "stories"))
       || (request.method === "PUT" && /^communities\/[a-f0-9-]{36}\/photo$/i.test(route));
-    const limit = communityPhoto || (request.method === "PUT" && route === "profiles/me") ? 425000
+    const blogWrite = (request.method === "POST" && route === "blog/entries")
+      || (request.method === "PUT" && /^blog\/entries\/[a-f0-9-]{36}$/i.test(route));
+    const limit = blogWrite ? 450000 : communityPhoto || (request.method === "PUT" && route === "profiles/me") ? 425000
       : (request.method === "POST" && route === "feed") ||
         (request.method === "PUT" && route === "profiles/me/cover") ? 750000 : MAX_BODY;
     const bytes = new Uint8Array(limit);
