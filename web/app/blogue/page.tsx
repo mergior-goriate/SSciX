@@ -1,20 +1,22 @@
 import Link from "next/link";
 import { BlogList } from "./ui";
-import { categories } from "./categories";
+import { ArrowUpRight } from "lucide-react";
+import "./blogue.css";
 
 export const metadata = { title: "Blogue oficial da SSciX" };
 
 export default function Blog() {
-  return <main className="site-width information-shell network-stack">
-    <header className="information-hero">
-      <h1>Blogue oficial da SSciX</h1>
-      <p>A equipa publica novidades da rede, comunicados e oportunidades de participação.</p>
+  return <main className="site-width blog-shell">
+    <header className="blog-hero">
+      <div>
+        <h1>Blogue oficial <span>da SSciX</span></h1>
+        <p>A equipa publica novidades da rede, comunicados e oportunidades de participação.</p>
+      </div>
+      <nav className="blog-hero-links" aria-label="Opções do blogue">
+        <Link href="/blogue/escrever">O meu blogue <ArrowUpRight size={18} aria-hidden="true" /></Link>
+        <Link href="/blogue/politica">Política de publicação e monetização</Link>
+      </nav>
     </header>
-    <nav className="profile-actions" aria-label="Opções do blogue">
-      <Link href="/blogue/escrever">O meu blogue</Link>
-      <Link href="/blogue/politica">Política de publicação e monetização</Link>
-    </nav>
-    {Object.entries(categories).filter(([key]) => key !== "investigacao").map(([key, label]) =>
-      <section className="network-stack" key={key}><h2>{label}</h2><BlogList category={key} /></section>)}
+    <BlogList />
   </main>;
 }

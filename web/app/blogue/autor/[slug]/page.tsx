@@ -1,3 +1,4 @@
+import "../../blogue.css";
 import Link from "next/link";
 import { BlogList } from "../../ui";
 

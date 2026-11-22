@@ -1,3 +1,4 @@
+import "../blogue.css";
 import { BlogArticle } from "../ui";
 
 export const dynamic = "force-dynamic";
