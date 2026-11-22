@@ -105,6 +105,14 @@ class Community(Base):
     owner_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"))
 
 
+class ImportedArticle(Base):
+    __tablename__ = "article_references"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    doi: Mapped[str] = mapped_column(String(255), unique=True)
+    citation: Mapped[dict] = mapped_column(JSON)
+
+
 class Discussion(Base):
     __tablename__ = "discussions"
     moderation_hidden: Mapped[bool] = mapped_column(Boolean, server_default="false")
@@ -114,6 +122,8 @@ class Discussion(Base):
     author_id: Mapped[UUID] = mapped_column(ForeignKey("profiles.user_id", ondelete="CASCADE"), index=True)
     community_id: Mapped[UUID | None] = mapped_column(ForeignKey("communities.id", ondelete="CASCADE"), index=True)
     image: Mapped[str] = mapped_column(Text, server_default="")
+    article_id: Mapped[UUID | None] = mapped_column(ForeignKey("article_references.id"), index=True)
+    article_citation: Mapped[dict | None] = mapped_column(JSON(none_as_null=True))
     article_url: Mapped[str] = mapped_column(String(1000), server_default="")
     parent_id: Mapped[UUID | None] = mapped_column(ForeignKey("discussions.id", ondelete="CASCADE"), index=True)
     body: Mapped[str] = mapped_column(Text)
