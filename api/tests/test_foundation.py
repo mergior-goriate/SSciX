@@ -1,4 +1,4 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 import pytest
@@ -422,3 +422,80 @@ def test_account_settings_keep_email_until_confirmation(account):
     finally:
         with SessionFactory.begin() as db:
             db.execute(delete(User).where(User.email == new_email))
+
+
+def test_imported_article_reuses_doi_and_respects_debate_visibility(account, app_config, monkeypatch):
+    from app import network
+    from app.articles import Citation
+    from app.db import SessionFactory
+    from app.models import Discussion, ImportedArticle, User
+
+    owner, registration, mailbox = account
+    app, origin = app_config
+    root = "/api/v1"
+    doi = f"10.1234/{uuid4().hex}"
+    lookup = f"{root}/articles/lookup"
+    calls = []
+
+    def sign_in(client, data):
+        assert client.post(f"{root}/auth/register", json=data).status_code == 202
+        assert client.post(f"{root}/auth/verify", json={
+            "token": mailbox["verify"], "password": data["password"],
+        }).status_code == 204
+        assert client.post(f"{root}/auth/login", json={
+            "email": data["email"], "password": data["password"],
+        }).status_code == 204
+
+    def fetch(normalized_doi):
+        calls.append(normalized_doi)
+        return Citation(title="Título original", authors=["Ana Mateus"], year=2025, source="Revista de teste")
+
+    sign_in(owner, registration)
+    profile = owner.get(f"{root}/profiles/me").json()
+    profile.pop("email")
+    assert owner.put(f"{root}/profiles/me", json={**profile, "is_public": True}).status_code == 200
+    monkeypatch.setattr(network, "fetch_citation", fetch)
+    assert owner.post(lookup, json={"doi": "https://example.org/10.1234/example"}).status_code == 422
+    response = owner.post(lookup, json={"doi": f"https://doi.org/{doi.upper()}"})
+    assert response.status_code == 200, response.text
+    reference = response.json()
+    article_url = f"{root}/articles/{reference['id']}"
+    assert owner.get(article_url).status_code == 404
+    assert owner.post(lookup, json={"doi": f"doi: {doi}"}).json() == reference
+    assert calls == [doi]
+
+    community = owner.post(f"{root}/communities", json={
+        "name": f"Clube {uuid4().hex}", "description": "Discussões privadas", "is_private": True,
+    }).json()
+    private_post = owner.post(f"{root}/feed", json={
+        "body": "Discussão privada", "community_id": community["id"], "article_id": reference["id"],
+        "article_citation": {"title": "Título revisto", "authors": reference["authors"], "year": 2025},
+    })
+    assert private_post.status_code == 201, private_post.text
+    assert private_post.json()["article_citation"]["title"] == "Título revisto"
+    assert private_post.json()["article_url"] == f"https://doi.org/{doi}"
+
+    reader_slug = f"leitor-{uuid4().hex[:12]}"
+    reader_data = {**registration, "slug": reader_slug, "email": f"{reader_slug}@example.com"}
+    try:
+        with TestClient(app, base_url=origin, headers={"Origin": origin}) as reader:
+            sign_in(reader, reader_data)
+            assert reader.get(article_url).status_code == 404
+            public_post = owner.post(f"{root}/feed", json={"body": "Discussão aberta", "article_id": reference["id"]})
+            assert public_post.status_code == 201, public_post.text
+            public_data = reader.get(article_url).json()
+            assert public_data["title"] == "Título original"
+            assert public_data["communities"] == []
+            assert [post["id"] for post in public_data["discussions"]] == [public_post.json()["id"]]
+            assert reader.get(article_url, params={"community_id": community["id"]}).json()["discussions"] == []
+            owner_data = owner.get(article_url, params={"community_id": community["id"]}).json()
+            assert owner_data["communities"] == [{"id": community["id"], "name": community["name"]}]
+            assert [post["id"] for post in owner_data["discussions"]] == [private_post.json()["id"]]
+            with SessionFactory.begin() as db:
+                db.get(Discussion, UUID(public_post.json()["id"])).attachment_hidden = True
+            assert reader.get(article_url).status_code == 404
+    finally:
+        with SessionFactory.begin() as db:
+            db.execute(delete(User).where(User.email == reader_data["email"]))
+            db.execute(delete(Discussion).where(Discussion.article_id == UUID(reference["id"])))
+            db.execute(delete(ImportedArticle).where(ImportedArticle.doi == doi))

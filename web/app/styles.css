@@ -348,6 +348,14 @@ body:has(.feed-shell) .site-footer { display: none; }
 .attachment-label { position: relative; cursor: pointer; min-height: 36px; font-size: .9rem; padding: .32em .9em; }
 .attachment-label input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
 .attachment-label:focus-within { outline: 3px solid var(--brand); outline-offset: 2px; }
+.article-attachment, .article-confirmation { min-width: 0; }
+.article-confirmation { border: 1px solid var(--line); border-radius: 8px; padding: .8rem; }
+.post-article-card {
+  display: flex; align-items: flex-start; gap: .75rem; padding: .8rem;
+  border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere;
+}
+.post-article-card svg { flex: 0 0 auto; }
+.post-article-card small { display: block; margin-top: .2rem; }
 .composer-preview { display: flex; align-items: flex-start; flex-wrap: wrap; gap: .5rem; }
 .composer-preview img, .post-image { display: block; max-width: 100%; object-fit: contain; border-radius: 8px; }
 .composer-preview img { max-height: 150px; }

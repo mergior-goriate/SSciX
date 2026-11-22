@@ -30,6 +30,13 @@ function isOpportunity(kind: PostKind): kind is OpportunityKind {
 function OpportunityCategories() {
   return Object.entries(opportunityLabels).map(([value, text]) => <option key={value} value={value}>{text}</option>);
 }
+type Citation = { title: string; authors: string[]; year: number | null; source: string };
+type ArticleReference = Citation & { id: string; doi: string };
+type ArticlePageData = ArticleReference & {
+  communities: { id: string; name: string }[];
+  discussions: Post[];
+};
+
 type Post = {
   id: string;
   body: string;
@@ -37,6 +44,8 @@ type Post = {
   author_photo: string;
   image: string;
   article_url: string;
+  article_id?: string | null;
+  article_citation?: Citation | null;
   likes: number;
   comments: number;
   views: number;
@@ -74,9 +83,9 @@ const activityFilters = [
   { id: "reading", label: "Clube de leitura", icon: BookOpen },
 ] as const;
 
-function Composer({ endpoint, label, communityId, opportunities, compact, profile, onSaved }: {
+function Composer({ endpoint, label, communityId, opportunities, compact, profile, initialArticle, onSaved }: {
   endpoint: string; label: string; communityId?: string; opportunities?: boolean; compact?: boolean;
-  profile?: Profile; onSaved: (kind: PostKind) => void;
+  profile?: Profile; initialArticle?: ArticleReference; onSaved: (kind: PostKind) => void;
 }) {
   const canAttach = endpoint === "/feed";
   const [busy, setBusy] = useState(false);
@@ -84,7 +93,14 @@ function Composer({ endpoint, label, communityId, opportunities, compact, profil
   const [body, setBody] = useState("");
   const [kind, setKind] = useState<PostKind>(opportunities ? "scholarship" : "post");
   const [image, setImage] = useState("");
-  const [article, setArticle] = useState(false);
+  const [article, setArticle] = useState(Boolean(initialArticle));
+  const [doi, setDoi] = useState(initialArticle?.doi ?? "");
+  const [reference, setReference] = useState(initialArticle);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [showArticleLink, setShowArticleLink] = useState(false);
+  const { data: communities, error: communitiesError } = useNetworkData<Community[]>(
+    reference && !communityId ? "/communities" : null,
+  );
   const [emojiMenu, setEmojiMenu] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -123,24 +139,58 @@ function Composer({ endpoint, label, communityId, opportunities, compact, profil
     });
   }
 
+  async function lookupArticle() {
+    if (!doi.trim() || lookingUp) return;
+    setLookingUp(true);
+    setError("");
+    try {
+      const result = await api<ArticleReference>("/articles/lookup", "POST", { doi });
+      setReference(result);
+      setDoi(result.doi);
+      setShowArticleLink(false);
+    } catch (failure) {
+      setError(message(failure));
+    } finally {
+      setLookingUp(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !body.trim()) return;
+    if (busy || lookingUp || !body.trim()) return;
     const form = event.currentTarget;
     const fields = new FormData(form);
+    const selectedArticle = article ? reference : undefined;
+    if (article && !showArticleLink && doi.trim() && !selectedArticle) {
+      setError("Consulte o DOI antes de publicar.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       await api(endpoint, "POST", {
         body: body.trim(),
         ...(canAttach ? {
-          image, article_url: String(fields.get("article_url") ?? ""), community_id: communityId,
+          image, article_url: String(fields.get("article_url") ?? ""),
+          community_id: communityId ?? (fields.get("community_id") || null),
+          ...(selectedArticle ? {
+            article_id: selectedArticle.id,
+            article_citation: {
+              title: String(fields.get("article_title") ?? "").trim(),
+              authors: String(fields.get("article_authors") ?? "").split("\n").map((name) => name.trim()).filter(Boolean),
+              year: fields.get("article_year") ? Number(fields.get("article_year")) : null,
+              source: String(fields.get("article_source") ?? "").trim(),
+            },
+          } : {}),
           kind, title: String(fields.get("title") ?? ""), scheduled_date: fields.get("scheduled_date") || null,
         } : {}),
       });
       setBody("");
       setImage("");
-      setArticle(false);
+      setArticle(Boolean(initialArticle));
+      setDoi(initialArticle?.doi ?? "");
+      setReference(initialArticle);
+      setShowArticleLink(false);
       setEmojiMenu(false);
       setKind(opportunities ? "scholarship" : "post");
       form.reset();
@@ -175,9 +225,42 @@ function Composer({ endpoint, label, communityId, opportunities, compact, profil
         placeholder={opportunities ? "Indique a instituição, o local e os requisitos." : canAttach ? "Partilhe um resultado, uma pergunta ou uma proposta de colaboração." : undefined} required />
     </label>
     <small>Use @ seguido do endereço público do perfil para mencionar alguém.</small>
-    {(article || opportunities) && <label>{opportunities ? "Ligação para candidatura ou submissão" : "Ligação para um artigo"}
-      <input name="article_url" type="url" maxLength={1000} required={opportunities} />
+    {opportunities && <label>Ligação para candidatura ou submissão
+      <input name="article_url" type="url" maxLength={1000} required />
     </label>}
+    {article && !opportunities && <div className="form-stack article-attachment">
+      {showArticleLink ? <label>Ligação para um artigo
+        <input name="article_url" type="url" maxLength={1000} />
+      </label> : <>
+        <label>DOI do artigo
+          <input value={doi} maxLength={1024} disabled={busy || lookingUp}
+            onChange={(event) => { setDoi(event.target.value); setReference(undefined); }}
+            placeholder="10.1234/exemplo" />
+        </label>
+        {!reference && <button className="secondary" type="button" disabled={busy || lookingUp || !doi.trim()}
+          onClick={() => void lookupArticle()}>{lookingUp ? "A consultar…" : "Consultar DOI"}</button>}
+      </>}
+      {!reference && <button className="secondary" type="button" disabled={busy || lookingUp}
+        onClick={() => { setShowArticleLink(!showArticleLink); setError(""); }}>
+        {showArticleLink ? "Adicionar por DOI" : "Inserir ligação manualmente"}
+      </button>}
+      {reference && <fieldset className="form-stack article-confirmation" key={reference.id} disabled={busy}>
+        <legend>Confirma os dados do artigo</legend>
+        <label>Título do artigo<input name="article_title" required maxLength={1000} defaultValue={reference.title} /></label>
+        <label>Autores, um por linha
+          <textarea name="article_authors" rows={3} maxLength={24100} defaultValue={reference.authors.join("\n")} />
+        </label>
+        <label>Ano<input name="article_year" type="number" min={1} max={9999} defaultValue={reference.year ?? ""} /></label>
+        <label>Revista ou fonte<input name="article_source" maxLength={300} defaultValue={reference.source} /></label>
+        {!communityId && communities && <label>Publicar em
+          <select name="community_id">
+            <option value="">Feed geral</option>
+            {communities.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
+          </select>
+        </label>}
+        {!communityId && communitiesError && <small role="status">{communitiesError} Podes publicar no feed geral.</small>}
+      </fieldset>}
+    </div>}
     {image && <div className="composer-preview"><img src={image} alt="Pré-visualização da imagem" />
       <button type="button" className="secondary" onClick={() => setImage("")}>Remover imagem</button></div>}
     <div className="composer-tools">
@@ -189,9 +272,17 @@ function Composer({ endpoint, label, communityId, opportunities, compact, profil
             onChange={(event) => { void attach(event.target.files?.[0]); event.target.value = ""; }} />
         </label>
         {!opportunities && <button className="secondary icon-action" type="button" aria-expanded={article}
-          onClick={() => setArticle(!article)}><LinkIcon size={18} aria-hidden="true" /> Artigo</button>}
+          disabled={busy || lookingUp} onClick={() => {
+            setArticle(!article);
+            if (article) {
+              setDoi("");
+              setReference(undefined);
+              setShowArticleLink(false);
+              setError("");
+            }
+          }}><LinkIcon size={18} aria-hidden="true" /> {article ? "Remover artigo" : "Adicionar artigo"}</button>}
       </>}
-      <button className="primary" disabled={busy}>{label}</button>
+      <button className="primary" disabled={busy || lookingUp}>{label}</button>
     </div>
     {emojiMenu && <div className="emoji-options" role="group" aria-label="Escolher emoji">
       {emojis.map((emoji) => <button className="secondary" key={emoji} type="button" onClick={() => insertEmoji(emoji)}>{emoji}</button>)}
@@ -345,6 +436,13 @@ function PostActions({ post, onChange, report }: { post: Post; onChange?: () => 
   </>;
 }
 
+function citationByline(citation: Citation, compact = false) {
+  const authors = compact && citation.authors.length > 3
+    ? citation.authors.slice(0, 3).join(", ") + " et al."
+    : citation.authors.join(", ");
+  return [authors, citation.year, citation.source].filter(Boolean).join(" · ");
+}
+
 function PostCard({ post, topic, onChange }: { post: Post; topic?: boolean; onChange?: () => void }) {
   return <article className="panel network-post">
     <header>
@@ -366,7 +464,13 @@ function PostCard({ post, topic, onChange }: { post: Post; topic?: boolean; onCh
     </div>}
     <p className="biography">{post.body}</p>
     {post.image && <img className="post-image" src={post.image} alt="Imagem anexada à publicação" loading="lazy" />}
-    {post.article_url && <a className="icon-action" href={post.article_url} rel="noopener noreferrer" target="_blank">
+    {post.article_id && post.article_citation && <Link className="post-article-card" href={`/artigos/${post.article_id}`}>
+      <FileText size={20} aria-hidden="true" />
+      <span><strong>{post.article_citation.title}</strong>
+        <small>{citationByline(post.article_citation, true)}</small>
+      </span>
+    </Link>}
+    {!post.article_id && post.article_url && <a className="icon-action" href={post.article_url} rel="noopener noreferrer" target="_blank">
       <LinkIcon size={17} aria-hidden="true" /> {isOpportunity(post.kind) ? "Consultar anúncio" : "Abrir artigo"}
     </a>}
     {topic ? <PostActions post={post} onChange={onChange} report /> : <div className="profile-actions report-actions">
@@ -383,6 +487,50 @@ function Posts({ data, error, empty, topic, onChange }: {
   if (!data) return <p role="status">A carregar…</p>;
   if (!data.length) return <p className="muted">{empty}</p>;
   return data.map((post) => <PostCard key={post.id} post={post} topic={topic} onChange={onChange} />);
+}
+
+export function ArticleDiscussions({ id }: { id: string }) {
+  const [community, setCommunity] = useState("");
+  const [page, setPage] = useState(0);
+  const [sharing, setSharing] = useState(false);
+  const params = new URLSearchParams({ offset: String(page * feedPageSize), page_size: String(feedPageSize + 1) });
+  if (community) params.set("community_id", community);
+  const { data, error, refresh } = useNetworkData<ArticlePageData>(`/articles/${id}?${params}`);
+
+  if (error) return <p className="notice error" role="alert">{error}</p>;
+  if (!data) return <p role="status">A carregar o artigo…</p>;
+
+  return <div className="network-stack">
+    <header className="panel network-post">
+      <h1>{data.title}</h1>
+      <p className="muted">{citationByline(data)}</p>
+      <div className="profile-actions">
+        <a className="secondary" href={`https://doi.org/${data.doi.split("/").map(encodeURIComponent).join("/")}`}
+          target="_blank" rel="noopener noreferrer">Abrir artigo pelo DOI</a>
+        <button className="secondary" type="button" aria-expanded={sharing}
+          onClick={() => setSharing(!sharing)}>Partilhar artigo na SSciX</button>
+      </div>
+    </header>
+    {sharing && <Composer endpoint="/feed" label="Publicar" initialArticle={data}
+      onSaved={() => { setSharing(false); setCommunity(""); setPage(0); refresh(); }} />}
+    <section className="network-stack" aria-labelledby="article-discussions-title">
+      <h2 id="article-discussions-title">Debates sobre o artigo</h2>
+      {(data.communities.length > 0 || community) && <label>Comunidade
+        <select value={community} onChange={(event) => { setCommunity(event.target.value); setPage(0); }}>
+          <option value="">Todos os debates</option>
+          {community && !data.communities.some(({ id }) => id === community) &&
+            <option value={community}>Comunidade indisponível</option>}
+          {data.communities.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
+        </select>
+      </label>}
+      <Posts data={data.discussions.slice(0, feedPageSize)} error="" empty="Sem debates neste filtro." topic />
+      {(page > 0 || data.discussions.length > feedPageSize) && <nav className="profile-actions" aria-label="Páginas de debates">
+        <button type="button" className="secondary" disabled={!page} onClick={() => setPage(page - 1)}>Anterior</button>
+        <button type="button" className="secondary" disabled={data.discussions.length <= feedPageSize || page >= 5000}
+          onClick={() => setPage(page + 1)}>Seguinte</button>
+      </nav>}
+    </section>
+  </div>;
 }
 
 const attachmentFilters = [

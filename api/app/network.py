@@ -12,8 +12,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
 from .admin_models import UsageEvent
+from .articles import ArticleLookup, ArticleReference, Citation, doi_url, fetch_citation
 from .auth import DB, Member, get_user
-from .models import Bookmark, Community, CommunityMember, Discussion, Follow, Mention, Profile, Reaction, ReadingParticipant, User
+from .models import Bookmark, Community, CommunityMember, Discussion, Follow, ImportedArticle, Mention, Profile, Reaction, ReadingParticipant, User
 from .profiles import image_response, photo_url
 from .schemas import Input, Name, Slug, image_data, web_url
 from .search import interest_order, publication_search
@@ -61,6 +62,8 @@ class PostInput(ReplyInput):
     community_id: UUID | None = None
     image: str = Field(default="", max_length=700_000)
     article_url: str = Field(default="", max_length=1000)
+    article_id: UUID | None = None
+    article_citation: Citation | None = None
     kind: PostKind = "post"
     title: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] = ""
     scheduled_date: date | None = None
@@ -80,6 +83,8 @@ class PostView(BaseModel):
     author_photo: str
     image: str
     article_url: str
+    article_id: UUID | None = None
+    article_citation: Citation | None = None
     likes: int
     comments: int = 0
     views: int = 0
@@ -110,6 +115,11 @@ def visible_content(viewer: UUID | None = None):
     )
 
 
+def visible_post_authors():
+    return (Profile.is_public.is_(True), Profile.moderation_hidden.is_(False),
+            User.deactivated_at.is_(None), User.suspended.is_(False))
+
+
 def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
                viewer: UUID | None = None, offset: int = 0, popular: bool = False, by_deadline: bool = False,
                relevance=(), include_metrics: bool = True):
@@ -126,7 +136,7 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
         .join(Profile, Profile.user_id == Discussion.author_id)
         .join(User, User.id == Profile.user_id)
         .outerjoin(Community, Community.id == Discussion.community_id)
-        .where(Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False), *visible_content(viewer), *conditions)
+        .where(*visible_post_authors(), *visible_content(viewer), *conditions)
         .order_by(*relevance, *([likes.desc()] if popular else [Discussion.scheduled_date.asc().nulls_last()] if by_deadline else []),
                   date_order, Discussion.id)
         .offset(offset)
@@ -153,7 +163,10 @@ def read_posts(db: DB, *conditions, newest: bool = True, page_size: int = 40,
             id=post.id, body=post.body, author_name=author.name, author_slug=author.slug,
             created_at=post.created_at.isoformat(), community_id=post.community_id, community_name=community,
             author_photo=photo_url(author), image=f"/api/v1/feed/{post.id}/image" if post.image and not post.attachment_hidden else "",
-            article_url=post.article_url if not post.attachment_hidden else "", likes=likes, liked=liked, saved=saved,
+            article_url=post.article_url if not post.attachment_hidden else "",
+            article_id=post.article_id if not post.attachment_hidden else None,
+            article_citation=post.article_citation if not post.attachment_hidden else None,
+            likes=likes, liked=liked, saved=saved,
             comments=comments.get(post.id, 0), views=views.get(post.id, 0),
             kind=post.kind, title=post.title, scheduled_date=post.scheduled_date, resolved=post.resolved,
             can_edit=post.author_id == viewer,
@@ -233,6 +246,59 @@ def create_community(data: CommunityCreate, db: DB, request: Request):
     return community_view(value, author.user_id)
 
 
+def article_reference(article: ImportedArticle):
+    return ArticleReference(id=article.id, doi=article.doi, **article.citation)
+
+
+@router.post("/articles/lookup", response_model=ArticleReference, dependencies=same_origin)
+def lookup_article(data: ArticleLookup, db: DB, user: Member, request: Request):
+    limit(request, "article-lookup", 30, str(user.id))
+    if article := db.scalar(select(ImportedArticle).where(ImportedArticle.doi == data.doi)):
+        return article_reference(article)
+
+    citation = fetch_citation(data.doi)
+    db.execute(insert(ImportedArticle).values(doi=data.doi, citation=citation.model_dump())
+               .on_conflict_do_nothing(index_elements=[ImportedArticle.doi]))
+    article = db.scalar(select(ImportedArticle).where(ImportedArticle.doi == data.doi))
+    db.commit()
+    return article_reference(article)
+
+
+class ArticleCommunity(BaseModel):
+    id: UUID
+    name: str
+
+
+class ArticlePage(ArticleReference):
+    communities: list[ArticleCommunity]
+    discussions: list[PostView]
+
+
+@router.get("/articles/{article_id}", response_model=ArticlePage)
+def article_page(article_id: UUID, db: DB, user: Member, community_id: UUID | None = None,
+                 offset: int = Query(default=0, ge=0, le=100_000),
+                 page_size: int = Query(default=21, ge=1, le=40)):
+    criteria = (Discussion.article_id == article_id, Discussion.parent_id.is_(None),
+                Discussion.attachment_hidden.is_(False))
+    groups = db.execute(
+        select(Discussion.community_id, Community.name).select_from(Discussion)
+        .join(Profile, Profile.user_id == Discussion.author_id).join(User, User.id == Profile.user_id)
+        .outerjoin(Community, Community.id == Discussion.community_id)
+        .where(*criteria, *visible_post_authors(), *visible_content(user.id))
+        .distinct().order_by(Community.name)
+    ).all()
+    if not groups:
+        raise HTTPException(404, "Artigo indisponível.")
+    article = db.get(ImportedArticle, article_id)
+    if community_id:
+        criteria += (Discussion.community_id == community_id,)
+    return ArticlePage(
+        **article_reference(article).model_dump(),
+        communities=[ArticleCommunity(id=cid, name=name) for cid, name in groups if cid is not None],
+        discussions=read_posts(db, *criteria, viewer=user.id, offset=offset, page_size=page_size),
+    )
+
+
 @router.get("/feed", response_model=list[PostView])
 def feed(db: DB, user: Member, following: bool = False, community_id: UUID | None = None, author: Slug | None = None,
          content: Literal["articles", "images", "collaboration", "reading", "opportunities"] | None = None,
@@ -301,7 +367,18 @@ def publish(data: PostInput, db: DB, request: Request):
         raise HTTPException(422, "O título e a data destinam-se às actividades da comunidade.")
     if data.community_id is not None:
         get_community(data.community_id, db, author.user_id)
-    post = Discussion(**data.model_dump(), author_id=author.user_id)
+    fields = data.model_dump()
+    if data.article_id is not None:
+        if data.article_url or data.kind in OPPORTUNITY_KINDS:
+            raise HTTPException(422, "Anexe a referência DOI a uma publicação ou actividade.")
+        article = db.get(ImportedArticle, data.article_id)
+        if article is None:
+            raise HTTPException(422, "Consulte o DOI antes de publicar.")
+        fields["article_url"] = doi_url(article.doi)
+        fields["article_citation"] = fields["article_citation"] or article.citation
+    elif data.article_citation is not None:
+        raise HTTPException(422, "Consulte o DOI antes de editar a referência.")
+    post = Discussion(**fields, author_id=author.user_id)
     db.add(post)
     db.flush()
     record_mentions(db, post)
