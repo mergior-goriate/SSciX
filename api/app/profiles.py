@@ -88,7 +88,12 @@ class FollowStatus(BaseModel):
     following_count: int
 
 
-@router.get("", response_model=list[DirectoryProfile])
+class DirectoryCard(DirectoryProfile):
+    photo: str
+    has_cover: bool
+
+
+@router.get("", response_model=list[DirectoryCard])
 def directory(db: DB, q: str = Query(default="", max_length=100), offset: int = Query(default=0, ge=0, le=1_999_980),
               institution: str = Query(default="", max_length=160), area: str = Query(default="", max_length=160)):
     query = select(Profile).join(User).where(Profile.is_public.is_(True), Profile.moderation_hidden.is_(False), User.deactivated_at.is_(None), User.suspended.is_(False))
@@ -109,7 +114,15 @@ def directory(db: DB, q: str = Query(default="", max_length=100), offset: int = 
             institution_match(term),
             Profile.specialization.icontains(term, autoescape=True),
         ))
-    return db.scalars(query.order_by(Profile.name, Profile.slug).offset(offset).limit(21)).all()
+    rows = db.execute(query.with_only_columns(
+        Profile.slug, Profile.name, Profile.institution, Profile.specialization,
+        (Profile.photo != "").label("has_photo"), (Profile.cover != "").label("has_cover"),
+    ).order_by(Profile.name, Profile.slug).offset(offset).limit(21))
+    return [
+        DirectoryCard(slug=slug, name=name, institution=school, specialization=field,
+                      photo=f"/api/v1/profiles/{slug}/photo" if has_photo else "", has_cover=has_cover)
+        for slug, name, school, field, has_photo, has_cover in rows
+    ]
 
 
 def find_public_profile(db: DB, slug: str, *, lock: bool = False) -> Profile:

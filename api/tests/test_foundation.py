@@ -130,7 +130,7 @@ def test_public_directory_and_follow_privacy(account, app_config):
             assert owner.put(follow).status_code == 400
             assert follower.get(directory, params=search).json() == [{
                 "slug": data["slug"], "name": data["name"],
-                "institution": data["slug"], "specialization": "",
+                "institution": data["slug"], "specialization": "", "photo": "", "has_cover": False,
             }]
             assert follower.put(follow, headers={"Origin": "http://other.example"}).status_code == 403
             assert follower.put(follow).json() == {"following": True, "can_follow": True, "followers": 1, "following_count": 0}

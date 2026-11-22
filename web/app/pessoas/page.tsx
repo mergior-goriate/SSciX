@@ -1,5 +1,6 @@
 import { fetchMemberApi } from "../../member-api";
-import { ArrowRight, Search, Users } from "lucide-react";
+import { Search, Users } from "lucide-react";
+import FollowButton from "../u/[slug]/follow-button";
 import Avatar from "../avatar";
 import Link from "next/link";
 
@@ -10,6 +11,8 @@ type Entry = {
   name: string;
   institution: string;
   specialization: string;
+  photo: string;
+  has_cover: boolean;
 };
 
 const PAGE_SIZE = 20;
@@ -33,26 +36,32 @@ export default async function PeoplePage({ searchParams }: {
         <h1>Encontrar pessoas</h1>
         <span className="information-hero-icon"><Users size={32} aria-hidden="true" /></span>
       </header>
-      <section className="panel people-directory directory-workspace">
-        <form action="/pessoas">
-          <label htmlFor="people-query">Nome, instituição ou área de investigação</label>
-          <input id="people-query" name="q" defaultValue={q} maxLength={100} type="search" />
+      <section className="people-card-directory">
+        <form action="/pessoas" className="panel people-card-search">
+          <label className="people-keyword">Nome, instituição ou área de investigação
+            <input name="q" defaultValue={q} maxLength={100} type="search" />
+          </label>
           <label>Instituição<input name="institution" defaultValue={institution} maxLength={160} /></label>
           <label>Área de investigação<input name="area" defaultValue={area} maxLength={160} /></label>
           <button className="primary" type="submit"><Search size={17} aria-hidden="true" /> Pesquisar</button>
         </form>
         {!response?.ok ? <p role="status">A pesquisa está temporariamente indisponível.</p> :
           entries.length === 0 ? <p role="status">Nenhum perfil público encontrado.</p> :
-            <ul>
+            <ul className="people-card-grid" aria-label="Perfis encontrados">
               {entries.slice(0, PAGE_SIZE).map((entry) => (
-                <li key={entry.slug}>
-                  <Link href={`/u/${entry.slug}`}>
-                    <Avatar name={entry.name} />
-                    <span><strong>{entry.name}</strong>
-                      {(entry.institution || entry.specialization) && <small>{[entry.institution, entry.specialization].filter(Boolean).join(" · ")}</small>}
-                    </span>
-                    <ArrowRight size={17} aria-hidden="true" />
-                  </Link>
+                <li className="panel people-card" key={entry.slug}>
+                  <div className="people-card-cover" aria-hidden="true">
+                    {entry.has_cover && <img className="profile-cover-image" src={`/api/v1/profiles/${entry.slug}/cover`} alt="" loading="lazy" />}
+                  </div>
+                  <div className="people-card-details">
+                    <Link href={`/u/${entry.slug}`} className="people-card-profile">
+                      <Avatar name={entry.name} photo={entry.photo} />
+                      <strong>{entry.name}</strong>
+                    </Link>
+                    {entry.specialization && <p>{entry.specialization}</p>}
+                    {entry.institution && <small>{entry.institution}</small>}
+                    <div className="people-card-actions"><FollowButton slug={entry.slug} /></div>
+                  </div>
                 </li>
               ))}
             </ul>}

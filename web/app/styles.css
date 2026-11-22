@@ -1025,3 +1025,19 @@ body:has(.account-split) .site-footer { margin-top: 0; }
 .story-status:empty { margin: 0; }
 .story-viewer .academic-story-image { max-height: min(50dvh, 30rem); }
 .story-viewer p { margin: 0; }
+
+.people-card-directory { display: grid; gap: 1rem; margin-top: 1rem; }
+.people-card-search { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: .75rem; align-items: end; padding: 1rem; }
+.people-keyword { grid-column: 1 / -1; }
+.people-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: .85rem; list-style: none; padding: 0; margin: 0; }
+.people-card-grid > li { padding: 0; overflow: hidden; }
+.people-card-cover { position: relative; height: 4.4rem; background: var(--orbit-wash), var(--network-surface); }
+.people-card-details { position: relative; display: flex; flex-direction: column; align-items: center; gap: .35rem; padding: 0 .8rem .9rem; height: calc(100% - 4.4rem); text-align: center; overflow-wrap: anywhere; }
+.people-card-profile { display: grid; justify-items: center; gap: .4rem; margin-top: -1.5rem; text-decoration: none; }
+.people-card-profile:hover strong { text-decoration: underline; }
+.people-card-profile .feed-initials { border: 2px solid var(--paper); }
+.people-card-details p { margin: 0; }
+.people-card-actions { margin-top: auto; padding-top: .4rem; }
+@media (max-width: 560px) {
+  .people-card-search { grid-template-columns: minmax(0, 1fr); }
+}
