@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Script from "next/script";
+import { ArrowLeft, ArrowUpRight, BookOpen } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { api, message } from "../api-client";
 import { readImage } from "../media";
@@ -31,22 +32,53 @@ function Pages({offset, more, setOffset}: {offset: number; more?: boolean; setOf
   </nav>;
 }
 
-export function BlogList({slug, category}: {slug?: string; category?: string}) {
+const sectionFilters = [
+  ["", "Todas"], ["novidades", "Novidades"], ["comunicados", "Comunicados"], ["participacao", "Participação"],
+] as const;
+
+function BlogCard({entry, featured = false}: {entry: Entry; featured?: boolean}) {
+  return <article className={featured ? "blog-card blog-card-featured" : "blog-card"}>
+    {entry.cover && <img className="blog-card-image" src={entry.cover} alt="" loading={featured ? "eager" : "lazy"} />}
+    {featured && !entry.cover && <div className="blog-card-art" aria-hidden="true"><BookOpen size={72} strokeWidth={1} /></div>}
+    <div className="blog-card-copy">
+      <p className="blog-meta">
+        <span>{categories[entry.category]}</span>
+        <time dateTime={entry.published_at ?? undefined}>{entry.published_at?.slice(0, 10)}</time>
+      </p>
+      <h3><Link href={`/blogue/${entry.id}`}>{entry.title}</Link></h3>
+      <p className="blog-excerpt">{entry.body}</p>
+      <ArrowUpRight size={20} className="blog-card-arrow" aria-hidden="true" />
+    </div>
+  </article>;
+}
+
+export function BlogList({slug}: {slug?: string}) {
   const [offset, setOffset] = useState(0);
+  const [category, setCategory] = useState("");
   const query = new URLSearchParams({offset: String(offset)});
   if (slug) query.set("slug", slug);
   if (category) query.set("category", category);
   const {data, error} = useNetworkData<Result<Entry>>(`/blog/entries?${query}`);
-  return <>
+  const featured = !slug && !offset && !category ? data?.items[0] : undefined;
+  const items = featured ? data?.items.slice(1) : data?.items;
+
+  return <section className="blog-list" aria-label="Publicações">
+    {!slug && <div className="blog-filters" role="group" aria-label="Filtrar por secção">
+      {sectionFilters.map(([value, label]) => <button type="button" key={value} aria-pressed={category === value}
+        onClick={() => { setCategory(value); setOffset(0); }}>{label}</button>)}
+    </div>}
     <Feedback error={error} loading={!data} />
-    {data?.items.map(entry => <article className="panel form-stack" key={entry.id}>
-      <h3><Link href={`/blogue/${entry.id}`}>{entry.title}</Link></h3>
-      <time dateTime={entry.published_at ?? undefined}>{entry.published_at?.slice(0, 10)}</time>
-      <p>{entry.body}</p>
-    </article>)}
-    {data?.items.length === 0 && <p className="muted">Ainda não há publicações.</p>}
+    {featured && <div>
+      <h2 className="blog-section-title">Publicação mais recente</h2>
+      <BlogCard entry={featured} featured />
+    </div>}
+    {Boolean(items?.length) && <div>
+      <h2 className="blog-section-title">{featured ? "Mais publicações" : "Publicações"}</h2>
+      <div className="blog-grid">{items?.map(entry => <BlogCard key={entry.id} entry={entry} />)}</div>
+    </div>}
+    {data?.items.length === 0 && <p className="blog-empty">Ainda não há publicações nesta secção.</p>}
     <Pages offset={offset} setOffset={setOffset} more={data?.more} />
-  </>;
+  </section>;
 }
 
 function Ad({publisher, slot}: {publisher: string; slot: string}) {
@@ -82,14 +114,18 @@ export function BlogArticle({id, publisher, slot}: {id: string; publisher: strin
   }
   if (!entry || error) return <Feedback error={error} loading={!entry} />;
   return <>
-    <article className="panel form-stack">
+    <article className="blog-reading">
+      <Link className="blog-back" href={entry.official ? "/blogue" : `/blogue/autor/${entry.slug}`}>
+        <ArrowLeft size={17} aria-hidden="true" /> Voltar ao blogue
+      </Link>
+      <p className="blog-meta">{categories[entry.category]}</p>
       <h1>{entry.title}</h1>
       <p>{entry.official ? <Link href="/blogue">Equipa da SSciX</Link> :
         <Link href={`/blogue/autor/${entry.slug}`}>{entry.author}</Link>}
         {entry.published_at && <> · <time dateTime={entry.published_at}>{entry.published_at.slice(0, 10)}</time></>}</p>
       {(entry.hidden || entry.visibility === "draft") && <p role="status">Pré-visualização. Texto indisponível aos leitores.</p>}
-      {entry.cover && <img className="post-image" src={entry.cover} alt="" />}
-      <div className="biography">{entry.body.split(/(https?:\/\/[^\s<>"']+)/g).map((part, index) =>
+      {entry.cover && <img className="blog-reading-cover" src={entry.cover} alt="" />}
+      <div className="blog-reading-body">{entry.body.split(/(https?:\/\/[^\s<>"']+)/g).map((part, index) =>
         /^https?:\/\//.test(part) ? <a key={index} href={part} rel="ugc noopener noreferrer">{part}</a> : part)}</div>
       {entry.corrections.length > 0 && <section>
         <h2>Correcções e actualizações</h2>
