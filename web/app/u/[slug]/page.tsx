@@ -62,6 +62,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
             </div>
             <nav className="profile-section-nav" aria-label="Secções do perfil">
               <a href="#publicacoes">Publicações</a>
+              <Link href={`/blogue/autor/${profile.slug}`}>Blogue</Link>
               {(affiliations.length > 0 || profile.keywords.length > 0 || profile.social_links.length > 0) && <a href="#informacao">Informação</a>}
               {hasTrajectory && <a href="#trajectoria">Trajectória</a>}
             </nav>

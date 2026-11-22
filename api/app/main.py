@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from . import academic, admin, analytics, auth, commerce, messages, network, profiles
+from . import academic, admin, analytics, auth, blog, commerce, messages, network, profiles
 
 app = FastAPI(title="SSciX API", version="0.1.0", docs_url="/api/v1/docs",
               openapi_url="/api/v1/openapi.json", redoc_url=None)
@@ -37,6 +37,7 @@ def health(db: auth.DB):
 
 v1.include_router(auth.router)
 v1.include_router(commerce.public)
+v1.include_router(blog.public)
 members = APIRouter(dependencies=[Depends(auth.require_member)])
 
 
@@ -51,6 +52,8 @@ members.include_router(academic.router)
 members.include_router(commerce.members)
 members.include_router(messages.router)
 members.include_router(admin.router)
+members.include_router(blog.members)
+members.include_router(blog.editorial)
 members.include_router(admin.report_router)
 members.include_router(analytics.events)
 members.include_router(analytics.router)

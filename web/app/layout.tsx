@@ -37,6 +37,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <footer className="site-width site-footer">
           <nav aria-label="Ligações do rodapé">
             <Link href="/ajuda">Centro de ajuda</Link>
+            <Link href="/blogue">Blogue oficial</Link>
+            <Link href="/blogue/politica">Política dos blogues</Link>
             <Link href="/guias/revisao-de-literatura">Guia de revisão de literatura</Link>
             <Link href="/ajuda#comunidades">Políticas das comunidades</Link>
             <Link href="/termos#privacidade">Privacidade</Link>
