@@ -1,6 +1,6 @@
 from alembic import context
 
-from app import models  # registers the ORM tables
+from app import blog, models  # registers the ORM tables
 from app.db import Base, engine
 
 if context.is_offline_mode():

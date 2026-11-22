@@ -499,3 +499,57 @@ def test_imported_article_reuses_doi_and_respects_debate_visibility(account, app
             db.execute(delete(User).where(User.email == reader_data["email"]))
             db.execute(delete(Discussion).where(Discussion.article_id == UUID(reference["id"])))
             db.execute(delete(ImportedArticle).where(ImportedArticle.doi == doi))
+
+
+def test_blog_publication_and_moderation(account, app_config):
+    from app.admin_models import AdminGrant
+    from app.db import SessionFactory
+    from app.models import User
+    from sqlalchemy import select
+
+    author, data, mailbox = account
+    app, origin = app_config
+    root = "/api/v1"
+    assert author.post(f"{root}/auth/register", json=data).status_code == 202
+    assert author.post(f"{root}/auth/verify", json={
+        "token": mailbox["verify"], "password": data["password"],
+    }).status_code == 204
+    fields = {"title": "Texto de investigação", "body": "Resultados da investigação"}
+    assert author.post(f"{root}/blog/entries", json={**fields, "official": True}).status_code == 403
+    draft = author.post(f"{root}/blog/entries", json=fields)
+    assert draft.status_code == 201, draft.text
+    entry = draft.json()["id"]
+    save = f"{root}/blog/entries/{entry}"
+    view = f"{root}/blog/view/{entry}"
+    review = f"{root}/admin/blog/entries/{entry}"
+
+    with TestClient(app, base_url=origin, headers={"Origin": origin}) as guest:
+        assert guest.get(view).status_code == 404
+        assert author.get(f"{root}/blog/mine").json()["items"][0]["id"] == entry
+        assert author.put(save, json={**fields, "visibility": "members"}).status_code == 200
+        assert guest.get(view).status_code == 404
+        assert author.put(review, json={"action": "ads_on", "reason": "Revisão editorial"}).status_code == 403
+        with SessionFactory.begin() as db:
+            user = db.scalar(select(User).where(User.email == data["email"]))
+            db.add(AdminGrant(user_id=user.id, role="admin"))
+        assert author.put(review, json={"action": "ads_on", "reason": "Revisão editorial"}).status_code == 422
+        assert author.put(save, json={**fields, "visibility": "public"}).status_code == 200
+        assert guest.get(view).json()["ads"] is False
+        assert author.put(review, json={"action": "ads_on", "reason": "Revisão editorial"}).status_code == 204
+        assert guest.get(view).json()["ads"] is True
+        changed = {**fields, "body": "Resultados corrigidos", "visibility": "public"}
+        assert author.put(save, json=changed).status_code == 422
+        assert author.put(save, json={**changed, "correction": "Correcção de resultados"}).status_code == 200
+        updated = guest.get(view).json()
+        assert updated["ads"] is False
+        assert updated["corrections"][0]["note"] == "Correcção de resultados"
+        assert author.post(f"{root}/blog/{entry}/reports", json={"reason": "Referência por verificar"}).status_code == 204
+        assert author.get(f"{root}/admin/blog/reports").json()["items"][0]["entry_id"] == entry
+        assert author.put(review, json={"action": "hide", "reason": "Verificar a referência"}).status_code == 204
+        assert guest.get(view).status_code == 404
+        official = author.post(f"{root}/blog/entries", json={
+            **fields, "official": True, "category": "comunicados", "visibility": "public",
+        })
+        assert official.status_code == 201, official.text
+        public = guest.get(f"{root}/blog/entries", params={"category": "comunicados"}).json()
+        assert public["items"][0]["author"] == "Equipa da SSciX"
